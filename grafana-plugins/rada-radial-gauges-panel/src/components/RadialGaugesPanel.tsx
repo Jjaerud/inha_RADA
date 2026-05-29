@@ -39,11 +39,11 @@ const RadialGauge: React.FC<GaugeProps> = ({
   label, value, gradient, size, showOrbit, showHalo, showFlowDash, showCenterDot,
 }) => {
   const [from, to] = GRADIENT_PAIRS[gradient];
-  const stroke = size * 0.108;        // ring thickness (≈14 @ size 130, 원본 스펙)
+  const stroke = size * 0.108;        // thickness ≈14 @ size 130 (원본 스펙)
   const cx = size / 2;
   const cy = size / 2;
-  const r  = (size - stroke) / 2 - 4;
-  const orbitR = r + stroke + 6;      // 원본 orbitSize = size + 28
+  const r  = size / 2 - stroke / 2 - 8;   // 원본: r = size/2 - thickness/2 - 8 = 50
+  const orbitR = r + stroke + 6;
   const clamped = Math.max(0, Math.min(100, value));
   const frac = clamped / 100;
 
@@ -62,7 +62,17 @@ const RadialGauge: React.FC<GaugeProps> = ({
   // largeArc=1 (270>180), sweep=1 (각도 증가 방향 = 윗쪽 경유)
   const arcPath = `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 1 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
   const valueOffset = arcLen * (1 - frac);                 // start(좌하단)부터 frac 채움
-  const [knobX, knobY] = pt(START_DEG + SWEEP_DEG * frac); // value arc 끝점
+  const valueDeg = START_DEG + SWEEP_DEG * frac;
+  const [knobX, knobY] = pt(valueDeg);                     // value arc 끝점
+
+  // 흐르는 dash 는 "값 arc 구간(start→value)" 안에서만 흐른다(원본). 전체 270°
+  // track 을 한 바퀴 도는 게 아니라 실제 값만큼만. 별도 value-arc path 사용.
+  const valueArcLen = r * toRad(SWEEP_DEG * frac);
+  const sweepSeg = Math.max(8, valueArcLen * 0.18);
+  const gapSeg = valueArcLen + sweepSeg;
+  const [vx, vy] = pt(valueDeg);
+  const largeArcV = SWEEP_DEG * frac > 180 ? 1 : 0;
+  const valueArcPath = `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${largeArcV} 1 ${vx.toFixed(2)} ${vy.toFixed(2)}`;
 
   // Unique IDs so multiple gauges on the same page don't share gradients
   const uid = `rg-${gradient}-${size}-${Math.round(value * 10)}`;
@@ -93,10 +103,10 @@ const RadialGauge: React.FC<GaugeProps> = ({
           </linearGradient>
         </defs>
 
-        {/* 바깥 점선 orbit — 천천히 회전 (원본: rada-spin 28s, dash "4 9") */}
+        {/* 바깥 점선 orbit — 천천히 회전 (원본: stops[1]=to 색, dash "4 9") */}
         {showOrbit && (
           <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'rada-blob-rotate-cw 28s linear infinite' }}>
-            <circle cx={cx} cy={cy} r={orbitR} fill="none" stroke={from}
+            <circle cx={cx} cy={cy} r={orbitR} fill="none" stroke={to}
               strokeOpacity={0.28} strokeWidth={1.4} strokeDasharray="4 9" />
           </g>
         )}
@@ -109,12 +119,13 @@ const RadialGauge: React.FC<GaugeProps> = ({
           strokeDasharray={arcLen} strokeDashoffset={valueOffset}
           style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
 
-        {/* 흐르는 dash — arc 위 하이라이트가 흐름 (원본: animate dashoffset 2.6s) */}
-        {showFlowDash && (
-          <path d={arcPath} fill="none" stroke={to} strokeOpacity={0.55}
-            strokeWidth={stroke * 0.4} strokeLinecap="round"
-            strokeDasharray={`${(stroke * 1.4).toFixed(1)} ${arcLen.toFixed(1)}`}>
-            <animate attributeName="stroke-dashoffset" from={arcLen.toFixed(1)} to="0"
+        {/* 흐르는 dash — 값 arc 구간 안에서만 하이라이트가 흐름 (원본).
+            두께는 track 그대로(thickness), 전체 270° 가 아니라 value arc path 사용. */}
+        {showFlowDash && frac > 0.01 && (
+          <path d={valueArcPath} fill="none" stroke={to} strokeOpacity={0.55}
+            strokeWidth={stroke} strokeLinecap="round"
+            strokeDasharray={`${sweepSeg.toFixed(1)} ${gapSeg.toFixed(1)}`}>
+            <animate attributeName="stroke-dashoffset" from={(sweepSeg + gapSeg).toFixed(1)} to="0"
               dur="2.6s" repeatCount="indefinite" />
           </path>
         )}
@@ -172,15 +183,16 @@ export const RadialGaugesPanel: React.FC<Props> = ({ data, options, width, heigh
       style={{
         width,
         height,
+        // 원본 Card: decoTone(RADA.cyan #00c4d4) 베이스 + accent(GRAD.cool) 우상단 radial
         background: `
-          radial-gradient(ellipse 140% 110% at 100% 0%, rgba(0,196,212,0.20) 0%, transparent 78%),
-          linear-gradient(135deg, #ffffff 0%, #fafbff 100%)
+          radial-gradient(circle at 100% 0%, #3b82f622 0%, #6d4cff08 55%, transparent 75%),
+          linear-gradient(135deg, #ffffff 0%, #00c4d410 100%)
         `,
         borderRadius: 18,
         border: '1px solid rgba(15,20,50,0.06)',
         boxShadow: '0 1px 3px rgba(15,20,50,0.04), 0 8px 32px rgba(15,20,50,0.06)',
         overflow: 'hidden',
-        padding: '18px 22px',
+        padding: '18px 22px 0',
         fontFamily: FONT_UI,
         display: 'flex',
         flexDirection: 'column',
@@ -204,7 +216,7 @@ export const RadialGaugesPanel: React.FC<Props> = ({ data, options, width, heigh
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
-          padding: '8px 0',
+          padding: '14px 18px 22px',   // 원본 bodyStyle
         }}
       >
         <RadialGauge
