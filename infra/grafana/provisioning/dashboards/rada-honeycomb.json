@@ -1,32 +1,51 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
   "uid": "rada-honeycomb",
   "title": "60주년 808 실습실 자원 모니터링",
-  "tags": ["rada", "honeycomb", "custom-panel"],
+  "tags": [
+    "rada",
+    "honeycomb",
+    "custom-panel"
+  ],
   "timezone": "Asia/Seoul",
   "schemaVersion": 39,
   "version": 2,
   "weekStart": "monday",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "refresh": "5s",
-  "templating": { "list": [] },
+  "templating": {
+    "list": []
+  },
   "panels": [
     {
       "id": 10,
       "type": "rada-blob-gauge-panel",
       "title": "",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT 82.5 AS value, 40 AS total"
+          "rawSql": "WITH online AS (\n  SELECT DISTINCT pc_id FROM pc_monitor.metrics_history\n  WHERE collected_at > now() - interval '5 minutes'\n),\nflagged AS (\n  SELECT DISTINCT pc_id FROM pc_monitor.anomaly_history\n  WHERE detected_at > now() - interval '30 minutes' AND severity IN ('MEDIUM','HIGH')\n)\nSELECT COALESCE(round(100.0 *\n  (SELECT count(*) FROM online WHERE pc_id NOT IN (SELECT pc_id FROM flagged))\n  / NULLIF((SELECT count(*) FROM online), 0), 1), 0) AS value"
         }
       ],
       "options": {
@@ -34,9 +53,9 @@
         "totalField": "total",
         "labelTopText": "LAB HEALTH",
         "labelMainText": "실습실 정상 비율",
-        "sublineText": "33 / 40대 정상",
+        "sublineText": "",
         "showDelta": true,
-        "deltaValue": "↓ 1.5%",
+        "deltaValue": "",
         "deltaIsNegative": true,
         "size": 150,
         "ringWidth": 12,
@@ -50,16 +69,30 @@
       "id": 11,
       "type": "rada-stat-card-panel",
       "title": "",
-      "gridPos": { "h": 6, "w": 4, "x": 6, "y": 0 },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 6,
+        "y": 0
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 2 AS value" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "WITH t AS (SELECT generate_series(now() - interval '28 min', now(), interval '4 min') AS ts)\nSELECT ts, (\n  SELECT count(DISTINCT a.pc_id) FROM pc_monitor.anomaly_history a\n  WHERE a.detected_at > ts - interval '30 minutes' AND a.detected_at <= ts\n    AND (a.anomaly_type ILIKE '%MINING%' OR a.message ILIKE '%mining%' OR a.alerts::text ILIKE '%MINING%')\n) AS value\nFROM t ORDER BY ts"
+        }
+      ],
       "options": {
         "category": "Threat · 30m",
         "label": "채굴 의심",
         "unit": "",
         "showDelta": true,
-        "deltaValue": "+1",
+        "deltaValue": "",
         "deltaDirection": "up",
         "deltaIsBad": true,
         "theme": "rose",
@@ -76,16 +109,30 @@
       "id": 12,
       "type": "rada-stat-card-panel",
       "title": "",
-      "gridPos": { "h": 6, "w": 4, "x": 10, "y": 0 },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 10,
+        "y": 0
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 4 AS value" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "WITH t AS (SELECT generate_series(now() - interval '28 min', now(), interval '4 min') AS ts)\nSELECT ts, (\n  SELECT count(DISTINCT a.pc_id) FROM pc_monitor.anomaly_history a\n  WHERE a.detected_at > ts - interval '30 minutes' AND a.detected_at <= ts\n    AND a.severity IN ('LOW','MEDIUM')\n) AS value\nFROM t ORDER BY ts"
+        }
+      ],
       "options": {
         "category": "Watch · 30m",
         "label": "점검 대상",
         "unit": "",
         "showDelta": true,
-        "deltaValue": "−1",
+        "deltaValue": "",
         "deltaDirection": "down",
         "deltaIsBad": false,
         "theme": "amber",
@@ -102,10 +149,24 @@
       "id": 13,
       "type": "rada-stat-card-panel",
       "title": "",
-      "gridPos": { "h": 6, "w": 4, "x": 14, "y": 0 },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 14,
+        "y": 0
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 1 AS value" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "WITH t AS (SELECT generate_series(now() - interval '28 min', now(), interval '4 min') AS ts)\nSELECT ts, (SELECT count(*) FROM pc_monitor.pc_info) - (\n  SELECT count(DISTINCT m.pc_id) FROM pc_monitor.metrics_history m\n  WHERE m.collected_at > ts - interval '5 minutes' AND m.collected_at <= ts\n) AS value\nFROM t ORDER BY ts"
+        }
+      ],
       "options": {
         "category": "Connectivity · 30m",
         "label": "오프라인",
@@ -128,16 +189,30 @@
       "id": 14,
       "type": "rada-stat-card-panel",
       "title": "",
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 8.6 AS value" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "WITH t AS (\n  SELECT generate_series(date_trunc('day', now()), now(), interval '2 hour') AS ts\n  UNION SELECT now()\n)\nSELECT ts, COALESCE((\n  SELECT round(avg((a.scores->>'final')::numeric), 1) FROM pc_monitor.anomaly_history a\n  WHERE a.detected_at >= date_trunc('day', now()) AND a.detected_at <= ts\n), 0) AS value\nFROM t ORDER BY ts"
+        }
+      ],
       "options": {
         "category": "Risk index · today",
         "label": "평균 anomaly score",
         "unit": "/ 50",
         "showDelta": true,
-        "deltaValue": "+1.4",
+        "deltaValue": "",
         "deltaDirection": "up",
         "deltaIsBad": true,
         "theme": "violet",
@@ -154,9 +229,17 @@
       "id": 1,
       "type": "rada-hexmap-panel",
       "title": "",
-      "gridPos": { "h": 18, "w": 14, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 18,
+        "w": 14,
+        "x": 0,
+        "y": 6
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
       "targets": [
         {
           "refId": "A",
@@ -194,10 +277,24 @@
       "id": 20,
       "type": "rada-concerns-panel",
       "title": "",
-      "gridPos": { "h": 12, "w": 10, "x": 14, "y": 6 },
+      "gridPos": {
+        "h": 12,
+        "w": 10,
+        "x": 14,
+        "y": 6
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 1" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT DISTINCT ON (a.pc_id)\n  a.pc_id, a.severity,\n  COALESCE(a.anomaly_type, '') AS type,\n  COALESCE(a.message, '') AS description,\n  (a.scores->>'final')::float AS score,\n  round(EXTRACT(EPOCH FROM (now() - a.detected_at)) / 60)::int AS minutes_ago\nFROM pc_monitor.anomaly_history a\nWHERE a.detected_at > now() - interval '1 hour'\nORDER BY a.pc_id, a.detected_at DESC"
+        }
+      ],
       "options": {
         "title": "Top concerns · live",
         "subtitle": "severity desc · 클릭 → PC 상세",
@@ -219,10 +316,24 @@
       "id": 21,
       "type": "rada-verdict-ribbon-panel",
       "title": "",
-      "gridPos": { "h": 6, "w": 10, "x": 14, "y": 18 },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 18
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 1" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT\n  COALESCE(judgment, verdict, 'NORMAL') AS verdict,\n  count(*) AS count,\n  CASE upper(COALESCE(judgment, verdict, 'NORMAL'))\n    WHEN 'NORMAL' THEN '#00b574'\n    WHEN 'SUSPICIOUS' THEN '#fbbf24'\n    WHEN 'DANGEROUS' THEN '#f43f5e'\n    WHEN 'HIGH_RISK' THEN '#f43f5e'\n    ELSE '#6d4cff' END AS color\nFROM pc_monitor.ai_judgment_history\nWHERE judged_at > now() - interval '1 hour'\nGROUP BY COALESCE(judgment, verdict, 'NORMAL'), upper(COALESCE(judgment, verdict, 'NORMAL'))\nORDER BY count DESC"
+        }
+      ],
       "options": {
         "title": "AI 판단 분포 · 1h",
         "subtitle": "ai_judgment_history · 25건",
@@ -241,10 +352,24 @@
       "id": 30,
       "type": "rada-concerns-panel",
       "title": "",
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 24 },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 24
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 1" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT\n  a.pc_id, a.severity,\n  COALESCE(a.anomaly_type, '') AS type,\n  COALESCE(a.message, '') AS description,\n  (a.scores->>'final')::float AS score,\n  round(EXTRACT(EPOCH FROM (now() - a.detected_at)) / 60)::int AS minutes_ago\nFROM pc_monitor.anomaly_history a\nWHERE a.detected_at > now() - interval '1 hour'\nORDER BY a.detected_at DESC\nLIMIT 12"
+        }
+      ],
       "options": {
         "title": "이상 탐지 피드",
         "subtitle": "anomaly_history · 1h · live",
@@ -266,10 +391,24 @@
       "id": 31,
       "type": "rada-radial-gauges-panel",
       "title": "",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
       "transparent": true,
-      "datasource": { "type": "postgres", "uid": "rada_pg" },
-      "targets": [{ "refId": "A", "format": "table", "rawSql": "SELECT 26.9 AS cpu, 22.6 AS gpu, 40.8 AS mem" }],
+      "datasource": {
+        "type": "postgres",
+        "uid": "rada_pg"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT\n  round(avg(cpu_percent)::numeric, 1) AS cpu,\n  round(avg(gpu_percent)::numeric, 1) AS gpu,\n  round(avg(mem_percent)::numeric, 1) AS mem\nFROM pc_monitor.metrics_history\nWHERE collected_at > now() - interval '5 minutes'"
+        }
+      ],
       "options": {
         "title": "LAB 평균 자원",
         "subtitle": "39대 평균 · last 5m",
