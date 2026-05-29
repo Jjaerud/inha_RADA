@@ -24,7 +24,20 @@ class CpuMemCollector(BaseCollector):
             self._boot_time = time.time()
 
     def collect(self) -> Dict:
+        # #3 (per-core CPU): aggregate 측정과 동일 ~1s 윈도우로 per-core 를 얻기
+        # 위해 percpu 를 prime 한 뒤 1s 블로킹 aggregate 호출, 직후 percpu 측정.
+        # percpu 와 aggregate 는 psutil 내부에서 독립 last-call 상태를 가진다.
+        try:
+            psutil.cpu_percent(interval=None, percpu=True)  # prime
+        except Exception:
+            pass
         cpu = psutil.cpu_percent(interval=self.cpu_interval)
+        try:
+            per_core = psutil.cpu_percent(interval=None, percpu=True) or []
+            per_core = [round(float(c), 1) for c in per_core]
+        except Exception:
+            per_core = []
+        single_core_max = round(max(per_core), 1) if per_core else 0.0
         mem = psutil.virtual_memory()
         logical = psutil.cpu_count(logical=True) or 0
         physical = psutil.cpu_count(logical=False) or 0
@@ -43,4 +56,6 @@ class CpuMemCollector(BaseCollector):
             "logical_cpu_count": logical,
             "physical_cpu_count": physical,
             "uptime_sec": uptime_sec,
+            "per_core_cpu_percent": per_core,
+            "single_core_max_percent": single_core_max,
         }

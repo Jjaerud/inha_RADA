@@ -143,6 +143,15 @@ def analyze(metrics: MetricsRequest):
             + list(net_cat.triggered_patterns)
             + list(sys_cat.triggered_patterns)
         )
+        # #2: stub 패턴(미구현) 중 config 에서 enabled 된 것 = "켰지만 평가 안 됨".
+        # 운영자가 조용한 미평가를 인지하도록 응답에 노출.
+        stub_status: dict = {}
+        for _c in (res_cat, net_cat, sys_cat):
+            stub_status.update(_c.detail.get("stub_status") or {})
+        enabled_but_unimplemented = [
+            name for name, st in stub_status.items()
+            if st.get("enabled") and not st.get("implemented")
+        ]
         category_signals = {
             "resource_abnormal":   bool(res_cat.abnormal),
             "network_abnormal":    bool(net_cat.abnormal),
@@ -150,6 +159,8 @@ def analyze(metrics: MetricsRequest):
             "sustained_minutes":   int(gating_result.sustained_minutes),
             "triggered_patterns":  triggered,
             "verdict_from_gating": gating_result.verdict,
+            "stub_patterns":              stub_status,
+            "enabled_but_unimplemented":  enabled_but_unimplemented,
         }
         pattern_result["category_signals"] = category_signals
 
@@ -193,6 +204,8 @@ def analyze(metrics: MetricsRequest):
             "sustained_minutes":   0,
             "triggered_patterns":  [],
             "verdict_from_gating": "NORMAL",
+            "stub_patterns":              {},
+            "enabled_but_unimplemented":  [],
             "error": str(_cat_e),
         }
 
@@ -219,6 +232,31 @@ def analyze(metrics: MetricsRequest):
             "detail":   global_hw["detail"],
         })
 
+    # Risk-vector interpretation layer (ADDITIVE — does not alter verdict).
+    # Re-projects the same signals onto 4 axes (mining/malfunction/aging/threat)
+    # so we can validate verdict-taxonomy in production before depending on it.
+    try:
+        from ..scorer.risk_vector import compute_risk_vector
+        rv = compute_risk_vector(
+            pattern_result.get("signals", {}),
+            pattern_result.get("scores", {}),
+        )
+        scores_block = pattern_result.get("scores")
+        if isinstance(scores_block, dict):
+            scores_block["risk_vector"] = rv
+    except Exception:
+        pass  # additive layer must never break the main path
+
+    # #8: 설명 신뢰도 — signal_quality(#5) + retrieval_evidence 결합 (ADDITIVE).
+    try:
+        from ..scorer.explanation_confidence import compute_explanation_confidence
+        pattern_result["explanation_confidence"] = compute_explanation_confidence(
+            retrieval_evidence,
+            pattern_result.get("signal_quality"),
+        )
+    except Exception:
+        pass  # additive layer must never break the main path
+
     # AI Agent
     agent_result = None
     if pattern_result["overall_severity"] != "NORMAL":
@@ -241,6 +279,12 @@ def analyze(metrics: MetricsRequest):
         "retrieval_evidence":  retrieval_evidence,
         "local_evidence":      pattern_result.get("local_evidence", []),
         "signals_missing":     pattern_result.get("signals_missing", []),
+        "signal_quality":      pattern_result.get("signal_quality", {
+            "overall": "FULL", "sources": {}, "degraded_sources": [], "reasons": {},
+        }),
+        "explanation_confidence": pattern_result.get("explanation_confidence", {
+            "level": "MEDIUM", "score": 2, "reasons": [], "inputs": {},
+        }),
         "category_signals":    pattern_result.get("category_signals", {
             "resource_abnormal":   False,
             "network_abnormal":    False,

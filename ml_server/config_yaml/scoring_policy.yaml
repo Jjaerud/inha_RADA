@@ -34,13 +34,18 @@ scores:
   unique_remote_ip_mid: 1
   new_remote_ip_burst: 1
   spike_with_companion: 1
-  # correlation (v0.6 약화 — catalog 8.3 절)
-  cpu_plus_net: 2          # 유지
-  disk_write_net_out: 2    # 5 → 2 (FP 주범)
-  unknown_proc_net: 2      # 5 → 2 (FP 주범)
-  appdata_net: 2           # 6 → 2 (FP 주범)
-  mining_known: 10         # 유지 (fast-path)
-  mining_pool_only: 5      # 8 → 5
+  # correlation — 아래는 FP=0 (P0/P1/P2 로컬 + NCP 7h39m) 로 검증된 실제 값.
+  # 주의: v0.6 메모에 "FP 주범이라 2로 약화" 라 적혀 있었으나 그 변경은
+  # indicator_calculator 코드에 적용된 적이 없었고(코드가 정책을 안 읽었음),
+  # 검증 baseline 은 모두 아래 값에서 측정됨. 2026-05 정합화 때 코드가 정책을
+  # 읽도록 바꾸면서 정책 값을 검증값으로 맞춤. 낮추려면 반드시
+  # tests/integration/test_sustained_scenarios.py 재실행으로 FP 재검증.
+  cpu_plus_net: 2
+  disk_write_net_out: 5
+  unknown_proc_net: 5
+  appdata_net: 6
+  mining_known: 10         # fast-path
+  mining_pool_only: 8
 
 context_discounts:
   startup: -1

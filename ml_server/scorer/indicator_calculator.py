@@ -155,23 +155,27 @@ def calculate_indicators(signals: Dict[str, Any], slot: str,
     if signals["dos_spike"]:          episode += 5
     if signals["persistent_ext"]:     episode += 2
 
-    # correlation
+    # correlation — 점수는 scoring_policy.yaml 의 scores 에서 읽는다 (단일
+    # 진실원천). default 는 FP=0 (P0/P1/P2/NCP) 로 검증된 실제 값. 과거 v0.6
+    # 주석이 "2 로 약화" 라 적었으나 그 변경은 코드에 적용된 적이 없고, 검증
+    # baseline 은 아래 default 값에서 측정되었다. (정합화: 2026-05)
+    _sc = get_scoring_policy().scores
     correlation = 0
     # cpu + disk + network 동시
     if signals["cpu_high"] and signals.get("net_out_sustained"):
-        correlation += 2
+        correlation += _sc.get("cpu_plus_net", 2)
     if signals.get("disk_write_net_out_sustained"):
-        correlation += 5
+        correlation += _sc.get("disk_write_net_out", 5)
     if signals.get("unknown_process_active") and signals.get("net_out_sustained"):
-        correlation += 5
+        correlation += _sc.get("unknown_proc_net", 5)
     if signals.get("appdata_exec") and signals.get("net_out_sustained"):
-        correlation += 6
+        correlation += _sc.get("appdata_net", 6)
     if signals.get("mining_process_or_pool"):
         # process or pool: mining_process_or_pool 자체 신호
         if signals["known_miner"]:
-            correlation += 10
+            correlation += _sc.get("mining_known", 10)
         else:
-            correlation += 8
+            correlation += _sc.get("mining_pool_only", 8)
 
     # ml after cap
     ml_breakdown = min(ml_cap, ml_score)

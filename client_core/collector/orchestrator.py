@@ -115,6 +115,9 @@ class CollectorOrchestrator:
             derived["logical_cpu_count"] = cpu_mem.get("logical_cpu_count", 0)
             derived["physical_cpu_count"] = cpu_mem.get("physical_cpu_count", 0)
             derived["uptime_sec"] = cpu_mem.get("uptime_sec", 0)
+            # #3 (per-core CPU): single-core-pegged 채굴 시그니처 탐지용.
+            derived["per_core_cpu_percent"] = cpu_mem.get("per_core_cpu_percent", [])
+            derived["single_core_max_percent"] = cpu_mem.get("single_core_max_percent", 0.0)
         except Exception as e:  # pragma: no cover - defensive
             derived_missing_reasons["cpu_mem"] = type(e).__name__
 

@@ -25,6 +25,51 @@ def _effective_whitelist() -> set:
     return base
 
 
+def _detect_process_recreation(history_list: list, whitelist_eff: set) -> bool:
+    """#6 (process_recreation): 동일 프로세스(name+path)가 동시 인스턴스는 적은데
+    PID 만 계속 바뀌며 재등장 = watchdog 식 재생성(채굴/악성 지속성) 의심.
+
+    multi-process 앱(chrome/svchost 등 동시 다수 PID)과 구분하기 위해
+    'concurrent_max ≤ 2' 조건을 둔다. 화이트리스트/PID 없는 항목은 제외.
+    ADDITIVE — legacy 점수 미반영(risk_vector 전용).
+    """
+    from collections import defaultdict
+
+    snaps = [h.get("top_processes", []) for h in history_list]
+    snaps = [s for s in snaps if isinstance(s, list)]
+    if len(snaps) < 6:
+        return False
+
+    concurrent_max: dict = defaultdict(int)
+    pids_over_time: dict = defaultdict(set)
+    presence: dict = defaultdict(int)
+    for s in snaps:
+        per_snap: dict = defaultdict(set)
+        for p in s:
+            if not isinstance(p, dict):
+                continue
+            name = (p.get("name", "") or "").lower()
+            if not name or name in whitelist_eff:
+                continue
+            pid = p.get("pid")
+            if pid is None:
+                continue
+            ident = (name, (p.get("path", "") or "").lower())
+            per_snap[ident].add(pid)
+        for ident, pidset in per_snap.items():
+            concurrent_max[ident] = max(concurrent_max[ident], len(pidset))
+            pids_over_time[ident] |= pidset
+            presence[ident] += 1
+
+    n = len(snaps)
+    for ident, pids in pids_over_time.items():
+        if (concurrent_max[ident] <= 2
+                and len(pids) >= 3
+                and presence[ident] >= max(3, n // 2)):
+            return True
+    return False
+
+
 def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
                     ml_weighted_score: float = 0.0) -> Dict[str, Any]:
     """원자 단위 24신호 + 컨텍스트 메타 반환.
@@ -145,6 +190,25 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
         for p in metrics.top_processes
     )
 
+    # ── #3 (PID 귀속): 외부 연결의 소유 프로세스 경로로 직접 판단 ──
+    # 저-CPU 백도어/채굴은 top_processes(상위 10 CPU)에 안 잡혀도, 외부 연결을
+    # 소유한 프로세스의 경로(appdata/temp)가 의심스러우면 강한 위협 근거.
+    # ADDITIVE: signals 에만 노출, legacy indicator 점수에는 미반영(risk_vector 전용).
+    def _suspicious_owner_path(path: str) -> bool:
+        pl = (path or "").lower()
+        if not pl:
+            return False
+        if "\\appdata\\" in pl:
+            return True
+        return any(sp in pl for sp in SUSPICIOUS_PATHS)
+
+    external_conn_suspicious_owner = any(
+        _suspicious_owner_path(conn.get("proc_path", ""))
+        and (conn.get("proc_name", "").lower() not in whitelist_eff)
+        for conn in metrics.external_connections
+        if isinstance(conn, dict)
+    )
+
     persistent_miner = has_history and len(known_miners) > 0 and any(
         sum(1 for h in history_list
             if any(p.get("name","").lower() == m.get("name","").lower()
@@ -209,6 +273,25 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
 
     mining_process_or_pool = (len(known_miners) > 0) or mining_pool_hit
 
+    # ── #3 (per-core CPU): single-core-pegged 채굴 시그니처 ──
+    # 한 코어만 ~100% 인데 전체 CPU 는 낮음 = 단일 스레드 채굴/루프 의심.
+    # ADDITIVE: signals 에만 노출, legacy 점수 미반영(risk_vector 전용).
+    single_core_max_pct = float(df.get("single_core_max_percent") or 0.0)
+    _cores = int(getattr(metrics, "cpu_core_count", 0) or 0)
+    if _cores <= 0:
+        _per_core = df.get("per_core_cpu_percent") or []
+        _cores = len(_per_core) if isinstance(_per_core, list) else 1
+    _cores = max(_cores, 1)
+    # 코어 1개 풀가동 시 기대 aggregate ≈ 100/cores. 최대 2코어 분량 이하일 때만 발화.
+    _one_core_aggregate = 100.0 / _cores
+    single_core_full = (
+        single_core_max_pct >= 90.0
+        and metrics.cpu_percent <= _one_core_aggregate * 2.0
+    )
+
+    # #6 (process_recreation): history 기반 PID churn 탐지 (ADDITIVE).
+    process_recreation = _detect_process_recreation(history_list, whitelist_eff)
+
     # spike_count_1m: external_packet_count 의 1분(12건) 합 ≥ 60 일 때 trigger
     # 단독 신호로는 0점 (indicator_calculator 에서 처리)
     spike_count_1m = metrics.external_packet_count >= 8  # 기존 net_external_high 와 동치
@@ -259,6 +342,10 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
         "new_remote_ip_burst": new_remote_ip_burst,
         "mining_process_or_pool": mining_process_or_pool,
         "spike_count_1m":    spike_count_1m,
+        # #3 (Phase 2) ADDITIVE 신호 — legacy 점수 미반영, risk_vector 전용.
+        "external_conn_suspicious_owner": external_conn_suspicious_owner,
+        "single_core_full":  single_core_full,
+        "process_recreation": process_recreation,  # #6 (Phase 2) ADDITIVE
     }
 
     # 수집 실패한 카테고리의 신호는 0/False 대신 명시적으로 drop (False 로 잠금).
@@ -268,7 +355,7 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
             "net_external_high", "mining_pool_ip", "outbound_spike", "dos_spike",
             "persistent_ext", "net_out_sustained",
             "disk_write_net_out_sustained", "new_remote_ip_burst",
-            "spike_count_1m",
+            "spike_count_1m", "external_conn_suspicious_owner",
         ):
             if k in signals:
                 signals[k] = False
@@ -276,6 +363,7 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
         for k in (
             "known_miner", "temp_exec", "appdata_exec", "exec_path_suspicious",
             "unknown_process_active", "persistent_miner", "mining_process_or_pool",
+            "process_recreation",
         ):
             if k in signals:
                 signals[k] = False

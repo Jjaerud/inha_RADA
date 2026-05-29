@@ -28,6 +28,9 @@ _DERIVED_KEYS = {
     # Cryptojacking 탐지 system pattern (S1) — Windows GetLastInputInfo
     "user_idle_ms",
     "user_idle_collection_missing_reason",
+    # Phase 2 #3 — per-core CPU (single-core-pegged 채굴 시그니처)
+    "per_core_cpu_percent",
+    "single_core_max_percent",
 }
 
 # 22키 중 sender가 채우는 2개(local_alerts, boxplot_signal) 제외 → 20키
@@ -53,14 +56,14 @@ def test_22_core_keys_preserved():
         assert k in metrics, f"missing core key: {k}"
 
 
-def test_derived_features_present_with_18_keys():
+def test_derived_features_present_with_20_keys():
     orch = _build_fast_orchestrator()
     metrics = orch.collect()
     assert "derived_features" in metrics
     df = metrics["derived_features"]
     assert isinstance(df, dict)
-    # 16 (F5 까지) + user_idle_ms + user_idle_collection_missing_reason = 18
-    assert len(df) == 18
+    # 18 (기존) + Phase2 per_core_cpu_percent + single_core_max_percent = 20
+    assert len(df) == 20
     assert set(df.keys()) == _DERIVED_KEYS
 
 

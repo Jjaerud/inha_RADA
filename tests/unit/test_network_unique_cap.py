@@ -66,6 +66,26 @@ def test_not_truncated_when_under_cap():
     assert len(out["external_connections"]) == 5
 
 
+def test_capped_entries_carry_pid_and_owner():
+    """#3 (PID 귀속): capped external_connections 에 pid + proc_name/proc_path 부착."""
+    conns = [
+        FakeConn(FakeAddr("10.0.0.1", 50000), FakeAddr("8.8.8.8", 4444), pid=777),
+    ]
+    fake_owner = {777: {"name": "miner.exe", "path": "C:\\Temp\\miner.exe"}}
+    with patch("client_core.collector.network.psutil.net_io_counters", return_value=FakeNetIO()), \
+         patch("client_core.collector.network.psutil.net_connections", return_value=conns), \
+         patch.object(NetworkCollector, "_resolve_owner",
+                      side_effect=lambda pid: fake_owner.get(pid, {"name": "", "path": ""})):
+        nc = NetworkCollector()
+        out = nc.collect()
+    entry = out["external_connections"][0]
+    assert entry["pid"] == 777
+    assert entry["proc_name"] == "miner.exe"
+    assert entry["proc_path"] == "C:\\Temp\\miner.exe"
+    # 기존 키도 보존
+    assert entry["ip"] == "8.8.8.8" and entry["port"] == 4444 and entry["status"]
+
+
 def test_unique_ip_port_process_counts():
     # 3개 동일 ip+port+pid (중복 2건), 2개 신규 ip
     conns = [

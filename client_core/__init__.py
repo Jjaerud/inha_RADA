@@ -30,4 +30,6 @@ if _sys.platform == "win32":
     _subprocess.Popen.__init__ = _no_window_popen_init
 
 
-__version__ = "9.0.0"
+# 9.1.0 — Phase 2 페이로드 강화: 외부 연결 소유 프로세스(pid/proc_name/proc_path),
+#         per-core CPU(per_core_cpu_percent/single_core_max_percent). 서버 하위호환.
+__version__ = "9.1.0"

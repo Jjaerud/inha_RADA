@@ -29,6 +29,34 @@ class CategoryResult:
         }
 
 
+# catalog 8.1 절 "보류" 항목 — 평가 로직 미구현(stub).
+# config 에서 enabled:true 로 켜져도 *절대 평가되지 않는다*. 이 사실을
+# 런타임 응답에 명시적으로 노출해, 운영자가 "켰으니 작동하겠지" 착각하지
+# 않도록 한다 (P0-2 정신: evidence 는 조용히 사라지면 안 됨).
+_STUB_PATTERNS = frozenset({
+    "R6_sm_no_tensor",
+    "R9_single_core_full",
+    "N1_stratum_periodicity",
+    "N6_dns_burst_during_idle",
+    "S2_locked_high_load",
+    "S5_process_recreation",
+})
+
+
+def _collect_stub_status(group_cfg: Dict[str, Any]) -> Dict[str, Dict[str, bool]]:
+    """이 그룹 config 에 정의된 stub 패턴의 {implemented, enabled} 상태.
+
+    enabled:true 인데 implemented:false 인 항목 = "켰지만 평가 안 됨" 경고 대상.
+    """
+    status: Dict[str, Dict[str, bool]] = {}
+    for name, entry in (group_cfg or {}).items():
+        if name not in _STUB_PATTERNS:
+            continue
+        enabled = not (isinstance(entry, dict) and entry.get("enabled") is False)
+        status[name] = {"implemented": False, "enabled": bool(enabled)}
+    return status
+
+
 def _t(config: Dict[str, Any], pattern: str) -> Optional[Dict[str, Any]]:
     """category_patterns.<group>.<pattern>.threshold 를 fetch.
 
@@ -132,10 +160,7 @@ def evaluate_resource_pattern(history_window: List[dict],
         if _window_minutes_satisfied(history_window, _r5, win):
             triggered.append("R5")
 
-    # R6 stub: tensor_core 비대칭 — 보류
-    th = _t(cfg, "R6_sm_no_tensor")
-    if th is not None:
-        detail["R6_stubbed"] = True  # 평가하지 않음
+    # R6 (tensor_core 비대칭) 는 stub — 평가 로직 미구현 (하단 stub_status 참조)
 
     # R7: VRAM used < 1GB AND GPU compute >= 90% sustained
     th = _t(cfg, "R7_vram_low_compute_high")
@@ -165,10 +190,11 @@ def evaluate_resource_pattern(history_window: List[dict],
         ):
             triggered.append("R8")
 
-    # R9 stub: per-core CPU — 보류
-    th = _t(cfg, "R9_single_core_full")
-    if th is not None:
-        detail["R9_stubbed"] = True
+    # R9 (per-core CPU) 는 stub — 평가 로직 미구현 (하단 stub_status 참조)
+
+    stub_status = _collect_stub_status(cfg)
+    if stub_status:
+        detail["stub_status"] = stub_status
 
     return CategoryResult(
         abnormal=bool(triggered),
@@ -188,10 +214,7 @@ def evaluate_network_pattern(history_window: List[dict],
     detail: Dict[str, Any] = {}
     cfg = (config or {}).get("network") or {}
 
-    # N1 stub
-    th = _t(cfg, "N1_stratum_periodicity")
-    if th is not None:
-        detail["N1_stubbed"] = True
+    # N1 (stratum periodicity) 는 stub — 평가 로직 미구현 (하단 stub_status 참조)
 
     # N2: 동일 외부 endpoint 가 최근 N 분 동안 매 분 등장
     th = _t(cfg, "N2_external_ip_persistent")
@@ -239,10 +262,11 @@ def evaluate_network_pattern(history_window: List[dict],
         if _window_minutes_satisfied(history_window, _n5, win):
             triggered.append("N5")
 
-    # N6 stub
-    th = _t(cfg, "N6_dns_burst_during_idle")
-    if th is not None:
-        detail["N6_stubbed"] = True
+    # N6 (DNS burst during idle) 는 stub — 평가 로직 미구현 (하단 stub_status 참조)
+
+    stub_status = _collect_stub_status(cfg)
+    if stub_status:
+        detail["stub_status"] = stub_status
 
     return CategoryResult(
         abnormal=bool(triggered),
@@ -277,10 +301,7 @@ def evaluate_system_pattern(history_window: List[dict],
         if _window_minutes_satisfied(history_window, _s1, win):
             triggered.append("S1")
 
-    # S2 stub (screen_locked) — 보류
-    th = _t(cfg, "S2_locked_high_load")
-    if th is not None:
-        detail["S2_stubbed"] = True
+    # S2 (screen_locked high load) 는 stub — 평가 로직 미구현 (하단 stub_status 참조)
 
     # S3: cpu/gpu >= 90% AND disk_io (read+write) mean < 1 MB/s sustained
     th = _t(cfg, "S3_high_load_disk_idle")
@@ -312,10 +333,11 @@ def evaluate_system_pattern(history_window: List[dict],
         if _window_minutes_satisfied(history_window, _s4, win):
             triggered.append("S4")
 
-    # S5 stub
-    th = _t(cfg, "S5_process_recreation")
-    if th is not None:
-        detail["S5_stubbed"] = True
+    # S5 (process recreation) 는 stub — 평가 로직 미구현 (하단 stub_status 참조)
+
+    stub_status = _collect_stub_status(cfg)
+    if stub_status:
+        detail["stub_status"] = stub_status
 
     return CategoryResult(
         abnormal=bool(triggered),

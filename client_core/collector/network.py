@@ -30,6 +30,25 @@ class NetworkCollector(BaseCollector):
         self._prev = None
         self.normal_ports: Set[int] = set(normal_ports or [])
 
+    @staticmethod
+    def _resolve_owner(pid: int) -> Dict[str, str]:
+        """pid → {name, path}. 권한/소멸 예외는 빈 값으로 흡수 (best-effort)."""
+        try:
+            p = psutil.Process(pid)
+            name = ""
+            path = ""
+            try:
+                name = p.name() or ""
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                pass
+            try:
+                path = p.exe() or ""
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                pass
+            return {"name": name, "path": path}
+        except Exception:
+            return {"name": "", "path": ""}
+
     def collect(self) -> Dict:
         net = psutil.net_io_counters()
         if self._prev is None:
@@ -85,11 +104,26 @@ class NetworkCollector(BaseCollector):
             else:
                 seen_triples.add(key)
 
-        # cap 적용된 응답 (기존 키 보존: external_connections 항목은 ip/port/status만)
-        capped = [
-            {"ip": c["ip"], "port": c["port"], "status": c["status"]}
-            for c in external_connections_raw[: self.CAP]
-        ]
+        # #3 (PID 귀속): cap 적용 응답에 pid + owner(name/path) 부착.
+        # 기존 키(ip/port/status)는 보존하고 sub-dict 만 확장(22키 top-level 불변).
+        # owner 해석은 capped (≤CAP) 항목에 한해 best-effort — 채굴/백도어가
+        # 저-CPU 라 top_processes(상위 10) 에 안 잡혀도, 외부 연결의 소유
+        # 프로세스 경로(appdata/temp 등)를 서버가 직접 볼 수 있게 한다.
+        owner_cache: Dict[int, Dict[str, str]] = {}
+        capped = []
+        for c in external_connections_raw[: self.CAP]:
+            entry = {"ip": c["ip"], "port": c["port"], "status": c["status"]}
+            pid = c.get("pid")
+            entry["pid"] = pid
+            if pid is not None:
+                if pid not in owner_cache:
+                    owner_cache[pid] = self._resolve_owner(pid)
+                entry["proc_name"] = owner_cache[pid].get("name", "")
+                entry["proc_path"] = owner_cache[pid].get("path", "")
+            else:
+                entry["proc_name"] = ""
+                entry["proc_path"] = ""
+            capped.append(entry)
 
         return {
             "inbound_delta_mb": inbound_delta,

@@ -6,7 +6,8 @@
 docs/
 ├── guides/      ← 작업 순서대로 따라가는 step-by-step 가이드 (5개)
 ├── reference/   ← 운영 / 협업 / 알고리즘 참고 (8개)
-└── analysis/    ← FP 검증 리포트 (시계열, 4개)
+├── analysis/    ← FP 검증 리포트 (시계열, 4개)
+└── worklog/     ← 진행 중 작업 기록 (미커밋 작업의 변경 로그)
 ```
 
 ---
@@ -59,6 +60,17 @@ docs/
 | **NCP** | **NCP managed** | **4,432+** | **0** | **0.000%** ✓ | [`fp_field_analysis_ncp.md`](analysis/fp_field_analysis_ncp.md) (최신) |
 
 mining 탐지력 (fast-path + stealth) 도 NCP 환경에서 즉시 발화 검증됨 (`fp_field_analysis_ncp.md` §5 참조).
+
+---
+
+## 📙 worklog/ — 진행 중 작업 기록
+
+아직 커밋하지 않은 작업의 변경 로그. 커밋 정책상 단계별로 바로 커밋하지 않는 작업을 추적.
+
+| 문서 | 대상 | 커밋 시점 |
+|---|---|---|
+| [`ml_scoring_upgrade.md`](worklog/ml_scoring_upgrade.md) | ML 스코어링 (risk_vector additive fork + YAML 정합화 + 시나리오 하베스) | ML 전체 Phase 완료 시 |
+| [`grafana_dashboard_upgrade.md`](worklog/grafana_dashboard_upgrade.md) | Grafana 커스텀 패널 6종 + 허니컴 대시보드 | 메인 대시보드 완성 시 |
 
 ---
 

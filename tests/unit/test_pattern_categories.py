@@ -206,3 +206,32 @@ def test_disabled_pattern_no_trigger(cfg):
     win = _build_window(30, cpu_mean=99.0, cpu_std=1.0)
     r = pc.evaluate_resource_pattern(win, {}, cfg)
     assert "R1" not in r.triggered_patterns
+
+
+# ── #2: stub 패턴 명시적 상태 노출 ──
+def test_stub_status_disabled_reports_implemented_false(cfg):
+    # 기본 cfg 에서 R6/R9 는 enabled:false → stub_status 에 implemented=False, enabled=False
+    win = _build_window(30, gpu_mean=99.0)
+    r = pc.evaluate_resource_pattern(win, {}, cfg)
+    ss = r.detail.get("stub_status", {})
+    assert ss["R6_sm_no_tensor"] == {"implemented": False, "enabled": False}
+    assert ss["R9_single_core_full"] == {"implemented": False, "enabled": False}
+
+
+def test_stub_status_enabled_but_unimplemented(cfg):
+    # stub 을 enabled:true 로 켜도 평가는 안 되지만, "켰음" 사실은 노출돼야 함
+    cfg["network"]["N1_stratum_periodicity"] = {"threshold": {}}  # enabled 기본 true
+    r = pc.evaluate_network_pattern(_build_window(30), {}, cfg)
+    ss = r.detail.get("stub_status", {})
+    assert ss["N1_stratum_periodicity"] == {"implemented": False, "enabled": True}
+    # 실제 평가는 여전히 안 됨
+    assert "N1" not in r.triggered_patterns
+
+
+def test_stub_patterns_constant_complete():
+    # catalog 8.1 절 보류 항목 6개가 모두 상수에 등재돼 있는지
+    assert pc._STUB_PATTERNS == {
+        "R6_sm_no_tensor", "R9_single_core_full",
+        "N1_stratum_periodicity", "N6_dns_burst_during_idle",
+        "S2_locked_high_load", "S5_process_recreation",
+    }

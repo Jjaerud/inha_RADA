@@ -15,6 +15,15 @@ from ..policy import get_scoring_policy
 from .signal_extractor import extract_signals
 from .indicator_calculator import calculate_indicators
 from .context_multiplier import apply_context_multiplier
+from .signal_quality import compute_signal_quality
+
+
+def _safe_signal_quality(sig_pack: Dict[str, Any]) -> Dict[str, Any]:
+    """signal_quality 계산은 additive 이므로 실패해도 메인 경로를 깨지 않는다."""
+    try:
+        return compute_signal_quality(sig_pack)
+    except Exception:
+        return {"overall": "FULL", "sources": {}, "degraded_sources": [], "reasons": {}}
 
 
 # P0-3 (docs/fp_field_analysis_v0.6.md §7-P0-3): score_breakdown 9키 중
@@ -419,6 +428,8 @@ def analyze_pattern(metrics: MetricsRequest, history: deque, slot: str,
         "verdict":          verdict,
         "policy_version":   policy_version,
         "signals_missing":  sig_pack.get("signals_missing", []),
+        # #5: 신호 품질 등급 (ADDITIVE — 점수 무관, 운영/AI 판단용 신뢰도).
+        "signal_quality":   _safe_signal_quality(sig_pack),
         "evidence_meta":    evidence_meta,
         "scores": {
             "final":              round(final_score, 2),
