@@ -1,20 +1,12 @@
-"""P1-4 — Retrieval positive score gating.
+"""Retrieval 은 final score 에 기여하지 않는다 (FP-fix #4, pilot 2026-05).
 
-docs/fp_field_analysis_v0.6.md §7-P1-4.
+과거 P1-4 는 positive retrieval 을 "2개 이상 다른 카테고리"가 있을 때만
+가산하는 gating 이었으나, pilot 에서 약한 네트워크 신호 + retrieval 조합이
+여전히 SUSPICIOUS 로 승격하는 FP 가 관찰됨. 이제 retrieval 은 verdict 점수에서
+완전히 분리하고, 유사도 근거는 explanation_confidence(설명 신뢰도)로만 노출한다.
 
-retrieval_score ranges from -2 to +5. Before P1-4, a positive
-retrieval_score (e.g. 3 for "similar HIGH_RISK exists" + 2 for "peer
-mismatch" = 5) could combine with a weak single-category breakdown to
-nudge final_score above OBSERVE/SUSPICIOUS thresholds purely on
-similarity grounds. retrieval is supposed to be borderline confirmation,
-not standalone evidence.
-
-P1-4: retrieval positive score (≥ +3) is only added to adjusted_score
-when at least 2 *other* breakdown categories are positive
-(resource/network/process/episode/correlation/ml). Otherwise the score
-contribution is zero and the response marks the gating in
-``retrieval_evidence.retrieval_score_gated``. Negative retrieval (NORMAL
-similars discount) is unaffected — it's still added.
+본 테스트는 "retrieval_score 가 무엇이든 final/breakdown 에 0 으로만 반영된다"는
+새 계약을 고정한다. retrieval_evidence 본문(top_k 등)은 그대로 보존돼야 한다.
 """
 from __future__ import annotations
 
@@ -42,7 +34,7 @@ def _reset():
 def _make_metrics(cpu_pct: float = 5.0, mem_pct: float = 30.0,
                   gpu_pct: float = 0.0) -> MetricsRequest:
     return MetricsRequest(
-        pc_id="pc-p1-4",
+        pc_id="pc-retr",
         timestamp="2026-05-23T10:00:00+09:00",
         cpu_percent=cpu_pct,
         memory_percent=mem_pct,
@@ -55,59 +47,31 @@ def _make_metrics(cpu_pct: float = 5.0, mem_pct: float = 30.0,
     )
 
 
-def test_positive_retrieval_no_other_categories_gated_out():
-    """retrieval_score=5 with no other breakdown evidence → score 0."""
-    m = _make_metrics()  # nothing else firing
-    ev = {"available": True, "retrieval_score": 5}
+@pytest.mark.parametrize("rscore", [5, 3, 2, -2])
+def test_retrieval_never_contributes_to_final(rscore):
+    """positive/negative 무관하게 retrieval 은 breakdown·effective 에서 0."""
+    m = _make_metrics()
+    ev = {"available": True, "retrieval_score": rscore}
     result = analyze_pattern(m, deque(), slot="free", retrieval_evidence=ev)
     breakdown = result["scores"]["score_breakdown"]
-    # retrieval shown in breakdown for audit, but the effective score
-    # added to adjusted is 0.
     assert breakdown["retrieval"] == 0
-    assert ev["retrieval_score_gated"] is True
     assert ev["retrieval_score_effective"] == 0
-
-
-def test_positive_retrieval_with_two_other_categories_passes():
-    """retrieval_score=5 with mem_high + cpu_high (resource cat) is still
-    a single category. Need two; supply high cpu (resource) + ML cap (ml)."""
-    m = _make_metrics(cpu_pct=92.0, mem_pct=92.0)
-    ev = {"available": True, "retrieval_score": 5}
-    # ml_weighted_score < -0.1 → ml category positive → 2 categories
-    result = analyze_pattern(m, deque(), slot="free",
-                             ml_weighted_score=-0.5,
-                             retrieval_evidence=ev)
-    breakdown = result["scores"]["score_breakdown"]
-    assert breakdown["retrieval"] == 5
     assert ev["retrieval_score_gated"] is False
-    assert ev["retrieval_score_effective"] == 5
 
 
-def test_negative_retrieval_always_applied():
-    """Negative retrieval (NORMAL discount) is not gated — still applied."""
+def test_retrieval_evidence_body_preserved():
+    """top_k 등 evidence 본문은 보존(검색/감사 + explanation_confidence 용)."""
     m = _make_metrics()
-    ev = {"available": True, "retrieval_score": -2}
-    result = analyze_pattern(m, deque(), slot="free", retrieval_evidence=ev)
-    breakdown = result["scores"]["score_breakdown"]
-    # Negative scores pass through.
-    assert breakdown["retrieval"] == -2
-    assert ev["retrieval_score_gated"] is False
+    ev = {"available": True, "retrieval_score": 5,
+          "top_k": [{"pc_id": "pc-x", "verdict": "HIGH_RISK", "distance": 0.01}]}
+    analyze_pattern(m, deque(), slot="free", retrieval_evidence=ev)
+    assert ev["available"] is True
+    assert ev["top_k"] and ev["top_k"][0]["verdict"] == "HIGH_RISK"
+    # 원본 retrieval_score 는 보존(explanation_confidence 가 참조)
+    assert ev["retrieval_score"] == 5
 
 
-def test_low_positive_retrieval_below_three_not_gated():
-    """retrieval_score below the +3 floor is not subject to gating; it
-    passes unchanged regardless of other-category count (so the threshold
-    is exclusive)."""
-    m = _make_metrics()
-    ev = {"available": True, "retrieval_score": 2}
-    result = analyze_pattern(m, deque(), slot="free", retrieval_evidence=ev)
-    breakdown = result["scores"]["score_breakdown"]
-    assert breakdown["retrieval"] == 2
-    assert ev["retrieval_score_gated"] is False
-
-
-def test_retrieval_unavailable_yields_zero_and_no_gating_marker():
-    """When retrieval block is missing 'available' is False, no score."""
+def test_retrieval_unavailable_yields_zero():
     m = _make_metrics()
     result = analyze_pattern(m, deque(), slot="free", retrieval_evidence=None)
     assert result["scores"]["score_breakdown"]["retrieval"] == 0

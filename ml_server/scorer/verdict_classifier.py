@@ -329,39 +329,18 @@ def analyze_pattern(metrics: MetricsRequest, history: deque, slot: str,
     context_discount = getattr(apply_context_multiplier, "_last_discount", 0)
     context_discount_clamped = getattr(apply_context_multiplier, "_last_clamped", False)
 
-    # retrieval score 반영 (context discount 전 점수에 가산)
-    retrieval_score_raw = 0
-    if isinstance(retrieval_evidence, dict) and retrieval_evidence.get("available"):
-        try:
-            retrieval_score_raw = int(retrieval_evidence.get("retrieval_score", 0) or 0)
-        except (TypeError, ValueError):
-            retrieval_score_raw = 0
-    # P1-4 (docs/fp_field_analysis_v0.6.md §7-P1-4): retrieval positive
-    # score 는 단독으로 verdict 승격에 기여하지 못한다. retrieval_score >= 3
-    # 이면서 다른 카테고리 evidence (breakdown 의 resource/network/process/
-    # episode/correlation/ml 중 점수 > 0 인 카테고리) 가 2 개 이상일 때만
-    # 점수 가산. 그 외에는 0 으로 잠그고 retrieval_evidence 본문은 그대로
-    # 유지 (검색/감사 용도). negative retrieval score 는 영향 없음 (gating
-    # 무관 그대로 가산).
-    _other_cats_positive = sum(
-        1 for k in ("breakdown_resource", "breakdown_network",
-                    "breakdown_process", "breakdown_episode",
-                    "breakdown_correlation", "breakdown_ml")
-        if int(indicators.get(k, 0) or 0) > 0
-    )
-    retrieval_gated = False
-    if retrieval_score_raw >= 3 and _other_cats_positive < 2:
-        retrieval_score = 0
-        retrieval_gated = True
-    else:
-        retrieval_score = retrieval_score_raw
+    # FP-fix #4 (pilot 2026-05): retrieval 은 final score 에 기여하지 않는다.
+    # 과거엔 positive retrieval(유사 HIGH/peer mismatch)이 약한 단일 카테고리와
+    # 합쳐져 verdict 를 SUSPICIOUS 로 끌어올리는 FP 원인이었다(P1-4 gating 으로도
+    # 완전히 못 막음). 유사도 근거는 verdict 점수가 아니라 explanation_confidence
+    # (설명 신뢰도) 로만 노출한다. retrieval_evidence 본문(top_k 등)은 검색/감사용
+    # 으로 그대로 보존하되, score 기여(effective)는 0 으로 고정.
+    retrieval_score = 0
     if isinstance(retrieval_evidence, dict):
-        # 본문에 gating 결과를 노출 (감사/디버그용)
-        retrieval_evidence["retrieval_score_effective"] = int(retrieval_score)
-        retrieval_evidence["retrieval_score_gated"] = bool(retrieval_gated)
-    adjusted_score = adjusted_score + retrieval_score
-    # R2: retrieval/context 감점이 score 를 음수로 끌어내려 moving average 를
-    # 오염시키는 것을 방지 — adjusted_score 의 하한은 0. (raw_score 는 영향 없음)
+        retrieval_evidence["retrieval_score_effective"] = 0
+        retrieval_evidence["retrieval_score_gated"] = False
+    # adjusted_score 에 retrieval 가산 없음. context_discount 가 음수로 끌어내린
+    # 경우만 0 하한 clamp (moving average 오염 방지).
     if adjusted_score < 0:
         adjusted_score = 0
 
