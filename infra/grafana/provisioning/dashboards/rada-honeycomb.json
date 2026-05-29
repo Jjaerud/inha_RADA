@@ -42,7 +42,7 @@
         "ringWidth": 12,
         "showStars": true,
         "ringGradient": "mint",
-        "demoMode": true,
+        "demoMode": false,
         "demoValue": 82.5
       }
     },
@@ -67,7 +67,7 @@
         "sparklineHeight": 64,
         "xLabels": "-30m,-22m,-15m,-7m,now",
         "tooltipFormat": "{value}대 의심",
-        "demoMode": true,
+        "demoMode": false,
         "demoValue": 2,
         "demoSparkline": "1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2"
       }
@@ -93,7 +93,7 @@
         "sparklineHeight": 64,
         "xLabels": "-30m,-22m,-15m,-7m,now",
         "tooltipFormat": "{value}대 점검",
-        "demoMode": true,
+        "demoMode": false,
         "demoValue": 4,
         "demoSparkline": "5,5,5,5,5,5,5,5,5,5,5,5,5,5,4,4,4,4,4,4,4,4,4,4,4,4,4,4"
       }
@@ -119,7 +119,7 @@
         "sparklineHeight": 64,
         "xLabels": "-30m,-22m,-15m,-7m,now",
         "tooltipFormat": "{value}대 오프라인",
-        "demoMode": true,
+        "demoMode": false,
         "demoValue": 1,
         "demoSparkline": "0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"
       }
@@ -145,7 +145,7 @@
         "sparklineHeight": 64,
         "xLabels": "00h,06h,12h,18h,now",
         "tooltipFormat": "{value} 점",
-        "demoMode": true,
+        "demoMode": false,
         "demoValue": 8.6,
         "demoSparkline": "2.4,2.8,3.0,2.9,2.7,3.1,3.4,3.8,4.0,4.2,3.9,3.7,4.0,4.4,4.8,5.2,5.4,5.6,5.5,5.4,5.6,5.7,5.8,5.9,5.8,5.7,5.8,8.6"
       }
@@ -212,7 +212,7 @@
         "descriptionField": "description",
         "scoreField": "score",
         "minutesAgoField": "minutes_ago",
-        "demoMode": true
+        "demoMode": false
       }
     },
     {
@@ -234,7 +234,7 @@
         "nameField": "verdict",
         "countField": "count",
         "colorField": "color",
-        "demoMode": true
+        "demoMode": false
       }
     },
     {
@@ -259,7 +259,7 @@
         "descriptionField": "description",
         "scoreField": "score",
         "minutesAgoField": "minutes_ago",
-        "demoMode": true
+        "demoMode": false
       }
     },
     {
@@ -290,7 +290,7 @@
         "showHalo": true,
         "showFlowDash": true,
         "showCenterDot": true,
-        "demoMode": true
+        "demoMode": false
       }
     }
   ]
