@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="6" y="14" width="52" height="36" rx="6" fill="#ffffff" stroke="#0d1226" stroke-opacity="0.1"/>
+  <text x="14" y="30" font-size="9" fill="#8b91ad" font-weight="500">Threat</text>
+  <text x="14" y="42" font-size="14" fill="#f43f5e" font-weight="700">2</text>
+  <path d="M 14 48 L 22 48 L 30 44 L 38 44 L 46 40 L 54 40" fill="none" stroke="#f43f5e" stroke-width="1.5"/>
+</svg>

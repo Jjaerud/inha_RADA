@@ -93,21 +93,45 @@ function buildCells(frames: DataFrame[], options: HexmapOptions): PcCell[] {
     }
   }
 
-  // If no rows at all, surface 40 placeholder OFFLINE cells so the layout
-  // still renders during provisioning / empty DB state.
-  if (cells.length === 0) {
-    for (let i = 1; i <= 40; i++) {
-      cells.push({
-        id: `PC-${String(i).padStart(2, '0')}`,
-        hostname: `pc-${i}`,
-        severity: -1,
-        score: null,
-        cpu: 0, gpu: 0, mem: 0,
-      });
+  // NOTE: padding to a fixed roster (incl. the all-empty case) is handled by
+  // applyRoster() in the component so live + offline cells merge consistently.
+  return cells;
+}
+
+// Build the ordered roster id list from options.
+function buildRoster(options: HexmapOptions): string[] {
+  const explicit = (options.rosterIds || '')
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (explicit.length > 0) {
+    return explicit;
+  }
+  const n = options.fillToCount > 0 ? Math.floor(options.fillToCount) : 0;
+  return Array.from({ length: n }, (_, i) => `PC-${String(i + 1).padStart(2, '0')}`);
+}
+
+function offlineCell(id: string): PcCell {
+  return { id, hostname: id, severity: -1, score: null, cpu: 0, gpu: 0, mem: 0 };
+}
+
+// Merge live cells onto a fixed roster. Roster slots without live data render
+// OFFLINE. Any live PC not in the roster is appended after the roster so it is
+// never hidden.
+function applyRoster(live: PcCell[], options: HexmapOptions): PcCell[] {
+  const roster = buildRoster(options);
+  if (roster.length === 0) {
+    return live;
+  }
+  const liveById = new Map(live.map((c) => [c.id, c]));
+  const out: PcCell[] = roster.map((id) => liveById.get(id) ?? offlineCell(id));
+  const rosterSet = new Set(roster);
+  for (const c of live) {
+    if (!rosterSet.has(c.id)) {
+      out.push(c);
     }
   }
-
-  return cells;
+  return out;
 }
 
 // Same mock distribution as design/mockdata.jsx PCS — for demo mode when
@@ -189,16 +213,11 @@ export const HexmapPanel: React.FC<Props> = ({ data, options, width, height }) =
     if (options.demoMode) {
       return buildDemoCells();
     }
+    // Live cells from the query, merged onto the fixed roster so non-reporting
+    // PCs (e.g. a 3-PC pilot in a 40-PC grid) render as OFFLINE rather than
+    // disappearing.
     const real = buildCells(data.series, options);
-    // If real data is all-offline (i.e. DB empty / connection just started),
-    // auto-fall to demo data for visual verification. User can suppress by
-    // unchecking demoMode and querying after data flows in.
-    const hasAnyLive = real.some((c) => c.severity !== -1);
-    if (!hasAnyLive && options.demoMode === false) {
-      // strict: respect user choice — leave as offline
-      return real;
-    }
-    return real;
+    return applyRoster(real, options);
   }, [data.series, options]);
 
   const size = options.hexSize;

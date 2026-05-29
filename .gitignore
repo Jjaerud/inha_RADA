@@ -14,8 +14,9 @@ server-spring/.gradle/
 server-spring/build/
 build/
 
-# PyInstaller (client_deployment.md)
-dist/
+# PyInstaller (client_deployment.md) — 루트의 PyInstaller 출력만 무시.
+# (grafana-plugins/<id>/dist 는 의도적으로 커밋 → NCP 가 npm 없이 git pull 로 패널 사용)
+/dist/
 *.spec
 
 # Local agent/tool state

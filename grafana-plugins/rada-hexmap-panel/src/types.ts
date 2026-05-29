@@ -15,6 +15,12 @@ export interface HexmapOptions {
   showLegend: boolean;
   showTooltip: boolean;
 
+  // Fixed roster — always render this many cells; PCs without live data show
+  // as OFFLINE. Lets a 3-PC pilot still display the full 40-cell honeycomb.
+  fillToCount: number;    // pad up to this many cells (0 = only live cells)
+  rosterIds: string;      // optional explicit roster, comma/space separated
+                          // (e.g. "PC-01,PC-02,..."). Empty → auto PC-01..PC-N.
+
   // Severity thresholds (final score → color)
   thresholdLow: number;     // < this → NORMAL (green)
   thresholdMedium: number;  // < this → LOW (saffron)
@@ -49,6 +55,8 @@ export const defaultOptions: HexmapOptions = {
   hexSize: 56,
   showLegend: true,
   showTooltip: true,
+  fillToCount: 40,
+  rosterIds: '',
   thresholdLow: 10,
   thresholdMedium: 20,
   thresholdHigh: 30,

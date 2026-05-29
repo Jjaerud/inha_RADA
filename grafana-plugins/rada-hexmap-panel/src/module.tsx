@@ -80,6 +80,26 @@ export const plugin = new PanelPlugin<HexmapOptions>(HexmapPanel).setPanelOption
       category: ['Inline title'],
     });
 
+  // Fixed roster — always render N cells; non-reporting PCs show OFFLINE.
+  builder
+    .addNumberInput({
+      path: 'fillToCount',
+      name: 'Roster size (offline 채움)',
+      description: '항상 이 개수만큼 셀을 렌더. 데이터 없는 PC 는 offline 으로 표시. '
+        + '예: 3대만 켜져 있어도 40 으로 두면 37 칸이 offline. 0 = 패딩 없음(live 만).',
+      defaultValue: defaultOptions.fillToCount,
+      settings: { min: 0, max: 200, integer: true },
+      category: ['Roster'],
+    })
+    .addTextInput({
+      path: 'rosterIds',
+      name: '명시적 roster (선택)',
+      description: '쉼표/공백 구분 pc_id 목록(예: "PC-01,PC-02,...,PC-40"). '
+        + '비우면 PC-01..PC-N 자동 생성. live 데이터의 pc_id 와 매칭돼야 점등.',
+      defaultValue: defaultOptions.rosterIds,
+      category: ['Roster'],
+    });
+
   // Demo mode — synthesize mixed-severity cells when no real data is
   // available (useful for visual design verification before DB has rows).
   builder.addBooleanSwitch({
