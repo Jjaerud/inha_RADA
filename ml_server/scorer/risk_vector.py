@@ -60,18 +60,24 @@ _THREAT = {
     "temp_exec": 1,
     "new_remote_ip_burst": 1,
     "mining_pool_ip": 2,
-    "dos_spike": 2,  # #7: inbound 폭주 = 표적/네트워크 보안 이벤트
     # #3 Phase 2: 의심 경로(appdata/temp) 프로세스가 외부 연결을 소유.
     # 저-CPU 라 top_processes 에 안 잡혀도 직접 귀속된 강한 위협 근거.
     "external_conn_suspicious_owner": 3,
     # #6 Phase 2: PID churn(watchdog 식 재생성) = 지속성/회피 행위.
     "process_recreation": 2,
 }
+# FP-fix #3 (pilot 2026-05): DOS/볼류메트릭은 보안위협(threat)과 분리한다.
+# inbound 폭주는 표적 의도(C2/exfil)와 다른 "네트워크 남용" 범주. 정상 대용량
+# 다운로드 오탐도 많아 별도 축으로 두고 threat 점수를 오염시키지 않게 한다.
+_NETWORK_ABUSE = {
+    "dos_spike": 3,
+}
 
 # Combination bonuses (signal pairs that are stronger together than apart).
 def _combo(signals: Dict[str, Any]) -> Dict[str, int]:
     g = lambda k: bool(signals.get(k))
-    bonus = {"mining": 0, "malfunction": 0, "aging": 0, "threat": 0}
+    bonus = {"mining": 0, "malfunction": 0, "aging": 0, "threat": 0,
+             "network_abuse": 0}
     # mining: flat high load on both + idle user
     if g("cpu_flat") and g("gpu_flat"):
         bonus["mining"] += 2
@@ -84,9 +90,9 @@ def _combo(signals: Dict[str, Any]) -> Dict[str, int]:
         bonus["threat"] += 2
     if g("disk_write_net_out_sustained"):
         bonus["threat"] += 2
-    # #7: inbound 폭주 + 지속 외부 endpoint = 단발 spike 보다 강한 표적 신호
+    # #3: inbound 폭주 + 지속 외부 endpoint = 단발 spike 보다 강한 네트워크 남용 신호
     if g("dos_spike") and g("persistent_ext"):
-        bonus["threat"] += 2
+        bonus["network_abuse"] += 2
     # #3 Phase 2: 의심 경로 소유 프로세스가 지속 outbound = 능동 유출 의심
     if g("external_conn_suspicious_owner") and g("net_out_sustained"):
         bonus["threat"] += 2
@@ -105,6 +111,7 @@ _PRIMARY_LABEL = {
     "malfunction": "MALFUNCTION",
     "aging": "AGING",
     "threat": "THREAT_SUSPICION",
+    "network_abuse": "NETWORK_ABUSE",
 }
 
 # An axis must clear this to be considered the primary type; otherwise NORMAL.
@@ -113,9 +120,10 @@ _PRIMARY_FLOOR = 4
 
 def compute_risk_vector(signals: Dict[str, Any],
                         indicators: Dict[str, int] | None = None) -> Dict[str, Any]:
-    """Project signals onto 4 risk axes. Pure function, no side effects."""
+    """Project signals onto 5 risk axes. Pure function, no side effects."""
     signals = signals or {}
-    axes = {"mining": 0, "malfunction": 0, "aging": 0, "threat": 0}
+    axes = {"mining": 0, "malfunction": 0, "aging": 0, "threat": 0,
+            "network_abuse": 0}
 
     for k, w in _MINING.items():
         if signals.get(k):
@@ -129,6 +137,9 @@ def compute_risk_vector(signals: Dict[str, Any],
     for k, w in _THREAT.items():
         if signals.get(k):
             axes["threat"] += w
+    for k, w in _NETWORK_ABUSE.items():
+        if signals.get(k):
+            axes["network_abuse"] += w
 
     for axis, b in _combo(signals).items():
         axes[axis] += b
@@ -138,9 +149,10 @@ def compute_risk_vector(signals: Dict[str, Any],
     primary = _PRIMARY_LABEL[top_axis] if axes[top_axis] >= _PRIMARY_FLOOR else "NORMAL"
 
     return {
-        "mining":       axes["mining"],
-        "malfunction":  axes["malfunction"],
-        "aging":        axes["aging"],
-        "threat":       axes["threat"],
-        "primary_type": primary,
+        "mining":        axes["mining"],
+        "malfunction":   axes["malfunction"],
+        "aging":         axes["aging"],
+        "threat":        axes["threat"],
+        "network_abuse": axes["network_abuse"],
+        "primary_type":  primary,
     }

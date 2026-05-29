@@ -146,10 +146,15 @@ promotion_gating:
 # 잡힌다. 절대값 + 연속 N회 조건을 함께 만족해야 발화.
 dos_detection:
   # 평균 대비 비율 외에 절대값 floor (MB / 5s). 미달이면 dos_spike False.
-  min_inbound_mb_per_5s: 20.0
+  # FP-fix #3 (pilot 2026-05): 20→100. 워크스테이션은 대용량 다운로드(게임/업데이트/
+  # 스트리밍)가 20~50MB/5s 를 흔히 찍어 정상 download 가 DOS 로 오탐(pilot PC-01
+  # 42·108MB/5s). inbound 볼륨만으론 정상 download 와 flood 를 구분 못 하므로
+  # floor 를 높이고(100=20MB/s) 연속성도 강화. 실효 차단은 network-only cap(#1)
+  # 이 담당; 본 floor 는 DOS_SUSPECTED alert 노이즈 저감 목적.
+  min_inbound_mb_per_5s: 100.0
   # 연속 spike 횟수 — N회 이상 연속해서 비율+절대값 모두 만족해야 발화.
-  # 1 = 즉시 발화 (cooldown 없음), 2 = 10초+ 지속해야 발화.
-  min_sustained_count: 2
+  # 2→3: 15초+(5s×3) 지속해야 발화 → 짧은 download burst 제외.
+  min_sustained_count: 3
 
 # === P1-3 (docs/fp_field_analysis_v0.6.md §7-P1-3) =====================
 # episode score 빠른 decay + alert cooldown.

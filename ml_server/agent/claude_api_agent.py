@@ -63,7 +63,8 @@ def build_prompt(metrics: MetricsRequest, pattern_result: dict,
         interp_text += (
             f"\n[위험 벡터 해석] primary={rv.get('primary_type','NORMAL')} "
             f"(채굴:{rv.get('mining',0)} 오작동:{rv.get('malfunction',0)} "
-            f"노후화:{rv.get('aging',0)} 보안위협:{rv.get('threat',0)})"
+            f"노후화:{rv.get('aging',0)} 보안위협:{rv.get('threat',0)} "
+            f"네트워크남용:{rv.get('network_abuse',0)})"
         )
     sq = pattern_result.get("signal_quality")
     if isinstance(sq, dict) and sq.get("overall") and sq.get("overall") != "FULL":

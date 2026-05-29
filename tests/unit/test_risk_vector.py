@@ -54,19 +54,20 @@ def test_below_floor_stays_normal():
     assert rv["primary_type"] == "NORMAL"
 
 
-def test_dos_spike_routes_to_threat_not_malfunction():
-    # #7: dos_spike(inbound 폭주)는 이 PC의 오작동이 아니라 표적 보안 이벤트 → threat 축
+def test_dos_spike_routes_to_network_abuse():
+    # #3: dos_spike(inbound 폭주)는 threat/malfunction 이 아니라 network_abuse 축
     rv = compute_risk_vector(_sig(dos_spike=True))
-    assert rv["threat"] == 2
+    assert rv["network_abuse"] == 3
+    assert rv["threat"] == 0
     assert rv["malfunction"] == 0
 
 
-def test_dos_plus_persistent_ext_picks_threat():
-    # #7: inbound 폭주 + 지속 외부 endpoint = combo 가산으로 threat 우세
+def test_dos_plus_persistent_ext_picks_network_abuse():
+    # #3: inbound 폭주 + 지속 외부 endpoint = network_abuse combo 가산
     rv = compute_risk_vector(_sig(dos_spike=True, persistent_ext=True))
-    # dos_spike(2) + persistent_ext(2) + combo(2) = 6 ≥ floor
-    assert rv["threat"] >= 4
-    assert rv["primary_type"] == "THREAT_SUSPICION"
+    # network_abuse: dos(3) + combo(2) = 5 ≥ floor; threat: persistent_ext(2)
+    assert rv["network_abuse"] >= 4
+    assert rv["primary_type"] == "NETWORK_ABUSE"
 
 
 def test_mem_critical_still_malfunction_axis():

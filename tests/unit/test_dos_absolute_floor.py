@@ -77,37 +77,50 @@ def test_high_ratio_below_floor_repeated_still_no_fire():
         assert sigs["dos_spike"] is False
 
 
-def test_ratio_and_absolute_single_hit_not_yet_sustained():
-    """Ratio + absolute floor met on a single sample is below default
-    min_sustained_count=2 — no fire on the first hit."""
-    history = _history(avg_inbound=0.5)  # 0.5 * 15 = 7.5 → 25 > 7.5 ratio ok
-    sigs = extract_signals(_metrics(inbound_mb=25.0), history, "free")["signals"]
-    assert sigs["dos_spike"] is False  # streak=1 < 2
-
-
-def test_ratio_and_absolute_sustained_two_hits_fires():
-    """Second consecutive hit reaches min_sustained_count=2 → fire."""
+def test_ratio_and_absolute_below_raised_floor_no_fire():
+    """FP-fix #3: 25MB 는 새 floor(100) 미만 → 연속이어도 발화 안 함
+    (예전 floor 20 이던 시절엔 발화했음)."""
     history = _history(avg_inbound=0.5)
     m = _metrics(inbound_mb=25.0)
+    for _ in range(5):
+        sigs = extract_signals(m, history, "free")["signals"]
+        assert sigs["dos_spike"] is False
+
+
+def test_ratio_and_absolute_single_hit_not_yet_sustained():
+    """Ratio + absolute floor(100) met on a single sample is below
+    min_sustained_count=3 — no fire on the first hit."""
+    history = _history(avg_inbound=0.5)  # 0.5 * 15 = 7.5 → 120 > 7.5 ratio ok
+    sigs = extract_signals(_metrics(inbound_mb=120.0), history, "free")["signals"]
+    assert sigs["dos_spike"] is False  # streak=1 < 3
+
+
+def test_ratio_and_absolute_sustained_three_hits_fires():
+    """Third consecutive hit reaches min_sustained_count=3 → fire."""
+    history = _history(avg_inbound=0.5)
+    m = _metrics(inbound_mb=120.0)
     extract_signals(m, history, "free")  # streak=1
-    sigs = extract_signals(m, history, "free")["signals"]  # streak=2
+    extract_signals(m, history, "free")  # streak=2
+    sigs = extract_signals(m, history, "free")["signals"]  # streak=3
     assert sigs["dos_spike"] is True
 
 
 def test_streak_resets_after_normal_sample():
     """One sample below floor resets the streak."""
     history = _history(avg_inbound=0.5)
-    m_hit = _metrics(inbound_mb=25.0)
+    m_hit = _metrics(inbound_mb=120.0)
     m_miss = _metrics(inbound_mb=0.5)  # ratio fails
     extract_signals(m_hit, history, "free")  # streak=1
+    extract_signals(m_hit, history, "free")  # streak=2
     extract_signals(m_miss, history, "free")  # reset
-    sigs = extract_signals(m_hit, history, "free")["signals"]  # streak=1 again
+    extract_signals(m_hit, history, "free")  # streak=1 again
+    sigs = extract_signals(m_hit, history, "free")["signals"]  # streak=2
     assert sigs["dos_spike"] is False
 
 
 def test_dos_floor_yaml_keys_loaded():
-    """The DosDetection dataclass exposes the YAML values."""
+    """The DosDetection dataclass exposes the YAML values (FP-fix #3)."""
     from ml_server.policy import get_scoring_policy
     p = get_scoring_policy()
-    assert p.dos_detection.min_inbound_mb_per_5s == pytest.approx(20.0)
-    assert p.dos_detection.min_sustained_count == 2
+    assert p.dos_detection.min_inbound_mb_per_5s == pytest.approx(100.0)
+    assert p.dos_detection.min_sustained_count == 3
