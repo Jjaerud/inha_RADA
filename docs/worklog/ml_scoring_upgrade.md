@@ -262,3 +262,33 @@ verdict 가 *얼마나 비정상인가* 라면, 이것은 "*얼마나 자신있�
 Phase 2 페이로드 강화(#3 PID 귀속, per-core CPU, exe 경로/서명 등)로 보강 예정.
 현재도 risk_vector 4축 + signal_quality + explanation_confidence + active signals +
 retrieval top-k 가 응답에 노출됨 (prompt 반영은 §10 다음 단계).
+
+## 14. Pilot FP 튜닝 (2026-05-29, NCP 운영 데이터 기반)
+
+NCP 파일럿(PC-01/02 본인 + PC-03 실습실)에서 anomaly 10건 수집. pc-smoke/
+pc-stealth(채굴 검증 합성)는 정상 발화(HIGH/SUSPICIOUS) 확인. **PC-01/03 7건은
+정상 데스크탑 사용(대용량 다운로드·클라우드 동기화·AppData 앱)이 SUSPICIOUS_EXFIL/
+DOS 로 오탐**. final 은 옛 indicator 합(exfil/dos 등)에서 나오고 새 8-key breakdown
+은 표시용임을 검증 후, 5개 서버-only 수정(전부 ml_server/, 재배포=git pull+ml 재빌드):
+
+- **#4 retrieval를 final 점수에서 분리**: positive retrieval 이 약신호와 합쳐
+  SUSPICIOUS 승격하던 FP 제거. 유사도는 explanation_confidence 로만. FP-safe.
+- **#1 network-only 약신호 cap**: 네트워크 신호만 활성 + 자원/시스템/강한근거 無
+  → verdict 최대 OBSERVE. known_miner/pool·PID귀속(external_conn_suspicious_owner)·
+  single_core_full·process_recreation·채굴 자원패턴은 면제. pilot FP 재현
+  시나리오(final=11 → capped OBSERVE) 회귀 테스트 추가.
+- **#3 DOS 분리 + 임계 상향**: dos floor 20→100MB/5s·sustained 2→3(대용량 다운로드
+  오탐 차단). risk_vector 에 `network_abuse` 축 신설, dos_spike 를 threat 에서 분리
+  (primary_type=NETWORK_ABUSE).
+- **#5 sustained gap-reset + cap**: sustained_minutes wall-clock 누적(offline 공백
+  포함, pilot 4949분) 버그 → 120초 초과 공백 시 앵커 리셋 + 720분 cap. 채굴 5초
+  연속 보고는 gap 無라 180분 게이팅 무영향.
+
+검증: 전체 **470 passed**. 모든 수정은 채굴 탐지(known_miner HIGH, cpu/gpu
+mining SUSPICIOUS+)를 깨지 않음을 sustained 시나리오로 확인.
+
+### 남은 FP 후보 (차기)
+- N2/N5 자체가 정상 장기연결에도 발화(network_abnormal 상시 true) → 패턴 정의
+  강화 필요(현재는 #1 cap 으로 verdict 억제).
+- exfil 강도를 PID 귀속(신규 v9.1.1 클라) 유무로 graded — 귀속 有면 상향 재허용.
+- 운영 통계에서 테스트 pc_id(pc-smoke/pc-stealth) 분리 집계.
