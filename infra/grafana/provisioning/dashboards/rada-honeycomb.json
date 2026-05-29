@@ -164,7 +164,7 @@
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "WITH t AS (SELECT generate_series(now() - interval '28 min', now(), interval '4 min') AS ts)\nSELECT ts, (SELECT count(*) FROM pc_monitor.pc_info) - (\n  SELECT count(DISTINCT m.pc_id) FROM pc_monitor.metrics_history m\n  WHERE m.collected_at > ts - interval '5 minutes' AND m.collected_at <= ts\n) AS value\nFROM t ORDER BY ts"
+          "rawSql": "WITH t AS (SELECT generate_series(now() - interval '28 min', now(), interval '4 min') AS ts)\nSELECT ts, (SELECT count(*) FROM pc_monitor.pc_info WHERE pc_id ~ '^PC-[0-9]+$') - (\n  SELECT count(DISTINCT m.pc_id) FROM pc_monitor.metrics_history m\n  WHERE m.collected_at > ts - interval '5 minutes' AND m.collected_at <= ts\n    AND m.pc_id ~ '^PC-[0-9]+$'\n) AS value\nFROM t ORDER BY ts"
         }
       ],
       "options": {

@@ -233,7 +233,7 @@ export const ConcernsPanel: React.FC<Props> = ({ data, options, width, height })
               marginTop: 2,
             }}
           >
-            {options.actionLabel}
+            {`전체 ${rows.length}건${options.actionLabel.includes('→') ? ' →' + options.actionLabel.split('→').slice(1).join('→') : ''}`}
           </div>
         )}
       </div>
