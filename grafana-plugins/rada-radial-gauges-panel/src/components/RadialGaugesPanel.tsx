@@ -205,9 +205,11 @@ const RadialGauge: React.FC<GaugeProps> = ({
 export const RadialGaugesPanel: React.FC<Props> = ({ data, options, width, height }) => {
   useEffect(() => { injectSharedStyles(); }, []);
 
-  const v1 = options.demoMode ? options.g1Demo : (lookupValue(data.series, options.g1Field) ?? options.g1Demo);
-  const v2 = options.demoMode ? options.g2Demo : (lookupValue(data.series, options.g2Field) ?? options.g2Demo);
-  const v3 = options.demoMode ? options.g3Demo : (lookupValue(data.series, options.g3Field) ?? options.g3Demo);
+  // demoMode 꺼지면 실데이터만 (없으면 0). 예전엔 데이터 없을 때 gNDemo 로
+  // fallback 해 운영 대시보드에 가짜값이 떴음 (pilot 발견).
+  const v1 = options.demoMode ? options.g1Demo : (lookupValue(data.series, options.g1Field) ?? 0);
+  const v2 = options.demoMode ? options.g2Demo : (lookupValue(data.series, options.g2Field) ?? 0);
+  const v3 = options.demoMode ? options.g3Demo : (lookupValue(data.series, options.g3Field) ?? 0);
 
   // Auto-size gauges to fit horizontally (3 gauges + gaps) and not exceed
   // the panel's vertical space (also leaving room for header + label).

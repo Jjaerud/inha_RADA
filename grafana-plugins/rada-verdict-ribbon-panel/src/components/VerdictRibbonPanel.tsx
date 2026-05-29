@@ -106,8 +106,9 @@ export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, heig
     if (options.demoMode) {
       return parseSegments(options.segmentsJson || DEFAULT_SEGMENTS_JSON);
     }
-    const live = extractSegments(data, options);
-    return live.length > 0 ? live : parseSegments(options.segmentsJson || DEFAULT_SEGMENTS_JSON);
+    // demoMode 꺼지면 실데이터만 (없으면 빈 세그먼트). 예전엔 비었을 때 demo
+    // 세그먼트로 fallback 해 운영 대시보드에 가짜 분포가 떴음 (pilot 발견).
+    return extractSegments(data, options);
   }, [data.series, options]);
 
   const total = segments.reduce((s, x) => s + x.count, 0) || 1;

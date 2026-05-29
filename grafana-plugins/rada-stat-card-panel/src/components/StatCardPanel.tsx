@@ -196,12 +196,14 @@ export const StatCardPanel: React.FC<Props> = ({ data, options, width, height })
   const liveValue = extractValue(data);
   const liveSpark = extractSparkline(data);
 
+  // demoMode 꺼지면 실데이터만(없으면 0/빈 스파크). 예전엔 데이터 없을 때
+  // demo 로 fallback 해 운영 대시보드에 가짜값이 떴음 (pilot 발견).
   const value =
-    options.demoMode || liveValue == null
+    options.demoMode
       ? options.demoValue
-      : liveValue;
+      : (liveValue == null ? 0 : liveValue);
   const spark =
-    options.demoMode || liveSpark.length < 2
+    options.demoMode
       ? options.demoSparkline.split(',').map((s) => Number(s)).filter((n) => Number.isFinite(n))
       : liveSpark;
 

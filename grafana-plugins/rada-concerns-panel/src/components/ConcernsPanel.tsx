@@ -182,8 +182,9 @@ export const ConcernsPanel: React.FC<Props> = ({ data, options, width, height })
     if (options.demoMode) {
       return DEMO_ROWS;
     }
-    const live = extractRows(data, options);
-    return live.length > 0 ? live : DEMO_ROWS;
+    // demoMode 꺼지면 실데이터만 (없으면 빈 목록). 예전엔 비었을 때 DEMO_ROWS
+    // 로 fallback 해 운영 대시보드에 가짜 concern 이 떴음 (pilot 발견).
+    return extractRows(data, options);
   }, [data.series, options]);
 
   return (

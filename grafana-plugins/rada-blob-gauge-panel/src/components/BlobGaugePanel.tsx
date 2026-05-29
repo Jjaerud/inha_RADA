@@ -61,7 +61,9 @@ export const BlobGaugePanel: React.FC<Props> = ({ data, options, width, height }
   useEffect(() => { injectSharedStyles(); }, []);
 
   const liveValue = firstNumericValue(data);
-  const value = options.demoMode || liveValue == null ? options.demoValue : liveValue;
+  // demoMode 가 꺼져 있으면 실데이터만 사용(없으면 0). 예전엔 데이터 없을 때
+  // demoValue 로 fallback 해 운영 대시보드에 가짜값이 떴음 (pilot 발견).
+  const value = options.demoMode ? options.demoValue : (liveValue == null ? 0 : liveValue);
   const clamped = Math.max(0, Math.min(100, value));
 
   // Layout: blob occupies the LEFT portion (~50% of card width). Right side
