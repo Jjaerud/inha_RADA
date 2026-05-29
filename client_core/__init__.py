@@ -32,4 +32,6 @@ if _sys.platform == "win32":
 
 # 9.1.0 — Phase 2 페이로드 강화: 외부 연결 소유 프로세스(pid/proc_name/proc_path),
 #         per-core CPU(per_core_cpu_percent/single_core_max_percent). 서버 하위호환.
-__version__ = "9.1.0"
+# 9.1.1 — config.yaml `pc_id` 오버라이드(RADA_PC_ID) 지원. install.bat 가 PC-XX 기입
+#         → 대시보드 고정 로스터(PC-01~PC-40) 매칭, pcid mismatch 해소.
+__version__ = "9.1.1"

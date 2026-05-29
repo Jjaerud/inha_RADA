@@ -14,6 +14,9 @@ class ClientConfig:
     spring_boot_url: str = defaults.SPRING_BOOT_URL
     mode: str = defaults.MODE
     api_key: Optional[str] = defaults.API_KEY
+    # 친화적 PC 식별자 오버라이드 (예: "PC-01"). None 이면 MAC 기반 PC_ID 사용.
+    # 대시보드 고정 로스터(PC-01~PC-40)와 매칭하기 위해 install.bat 가 기입.
+    pc_id: Optional[str] = None
     local_window_size: int = defaults.LOCAL_WINDOW_SIZE
     hw_baseline_window: int = defaults.HW_BASELINE_WINDOW
     normal_ports: Set[int] = field(default_factory=lambda: set(defaults.NORMAL_PORTS))
@@ -58,6 +61,9 @@ def _from_dict(data: dict) -> ClientConfig:
     if "api_key" in data:
         v = data["api_key"]
         kwargs["api_key"] = None if v is None else str(v)
+    if "pc_id" in data:
+        v = data["pc_id"]
+        kwargs["pc_id"] = None if v is None else str(v)
     if "local_window_size" in data:
         kwargs["local_window_size"] = int(data["local_window_size"])
     if "hw_baseline_window" in data:
@@ -89,6 +95,7 @@ def _apply_env_overrides(cfg: ClientConfig) -> ClientConfig:
     sb_url = os.environ.get("RADA_SPRING_BOOT_URL")
     api_key = os.environ.get("RADA_API_KEY")
     queue_path = os.environ.get("RADA_LOCAL_QUEUE_PATH")
+    pc_id_override = os.environ.get("RADA_PC_ID")
 
     if mode is not None:
         if mode not in defaults.VALID_MODES:
@@ -105,6 +112,8 @@ def _apply_env_overrides(cfg: ClientConfig) -> ClientConfig:
     if queue_path is not None:
         # 빈 문자열은 명시적 disable 로 간주
         cfg.local_queue_path = queue_path or None
+    if pc_id_override:
+        cfg.pc_id = pc_id_override
     return cfg
 
 

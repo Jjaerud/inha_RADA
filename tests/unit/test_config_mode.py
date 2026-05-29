@@ -66,3 +66,33 @@ def test_env_invalid_mode_raises(monkeypatch):
     monkeypatch.setenv("RADA_MODE", "garbage")
     with pytest.raises(ValueError):
         load_config()
+
+
+# ── pc_id 오버라이드 (대시보드 고정 로스터 매칭용) ──
+def test_pc_id_default_none():
+    assert ClientConfig().pc_id is None
+
+
+def test_from_dict_parses_pc_id():
+    cfg = _from_dict({"pc_id": "PC-01"})
+    assert cfg.pc_id == "PC-01"
+
+
+def test_env_override_pc_id(monkeypatch):
+    monkeypatch.setenv("RADA_PC_ID", "PC-03")
+    cfg = load_config()
+    assert cfg.pc_id == "PC-03"
+
+
+def test_runtime_uses_config_pc_id():
+    """config.pc_id 가 있으면 collector 가 그 id 로 페이로드를 만든다."""
+    from client_core.runtime.loop import ClientRuntime
+    rt = ClientRuntime(config=ClientConfig(pc_id="PC-07"))
+    assert rt.collector.pc_id == "PC-07"
+
+
+def test_runtime_falls_back_to_mac_pc_id():
+    from client_core.runtime.loop import ClientRuntime
+    from client_core.identity import PC_ID
+    rt = ClientRuntime(config=ClientConfig(pc_id=None))
+    assert rt.collector.pc_id == PC_ID

@@ -32,8 +32,9 @@ class ClientRuntime:
     def __init__(self, config: Optional[ClientConfig] = None) -> None:
         self.config = config or load_config(autodiscover=True)
 
+        # config.pc_id(예: "PC-01")가 있으면 친화적 식별자 사용, 없으면 MAC 기반.
         self.collector = CollectorOrchestrator(
-            pc_id=PC_ID,
+            pc_id=self.config.pc_id or PC_ID,
             normal_ports=self.config.normal_ports,
         )
         self.local_window = SlidingWindow(self.config.local_window_size)
@@ -126,7 +127,7 @@ class ClientRuntime:
     def _banner(self) -> None:
         cfg = self.config
         print("=== PC 자원 모니터링 클라이언트 v9 (모듈화) ===")
-        print(f"PC ID:       {PC_ID}")
+        print(f"PC ID:       {self.collector.pc_id}{'' if cfg.pc_id else ' (MAC)'}")
         print(f"GPU:         {'OK NVIDIA (GPUtil)' if GPU_AVAILABLE else 'X 미지원'}")
         print(f"pynvml:      {'OK' if PYNVML_AVAILABLE else 'X'}")
         print(f"ML 서버:     {cfg.ml_server_url}")

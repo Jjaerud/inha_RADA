@@ -299,6 +299,7 @@ copy /Y "%SRC%rada_client.exe" "C:\ProgramData\RADA\" >nul
 echo mode: springboot
 echo spring_boot_url: http://223.130.154.165:8080/api/metrics
 echo api_key: !RAW_KEY!
+echo pc_id: !PC_ID!
 echo interval: 5
 ) > "%APPDATA%\rada\config.yaml"
 
