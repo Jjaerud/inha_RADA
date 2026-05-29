@@ -39,147 +39,95 @@ const RadialGauge: React.FC<GaugeProps> = ({
   label, value, gradient, size, showOrbit, showHalo, showFlowDash, showCenterDot,
 }) => {
   const [from, to] = GRADIENT_PAIRS[gradient];
-  const stroke = size * 0.075;       // gauge ring thickness
+  const stroke = size * 0.108;        // ring thickness (≈14 @ size 130, 원본 스펙)
   const cx = size / 2;
   const cy = size / 2;
-  const r  = (size - stroke) / 2 - 6;  // padding for halo bleed
-  const orbitR = r + stroke * 0.9 + 6;
-  const haloR  = r * 0.85;
-  const circ = 2 * Math.PI * r;
+  const r  = (size - stroke) / 2 - 4;
+  const orbitR = r + stroke + 6;      // 원본 orbitSize = size + 28
   const clamped = Math.max(0, Math.min(100, value));
-  const offset = circ * (1 - clamped / 100);
+  const frac = clamped / 100;
 
-  // Endpoint knob position — at the current progress angle, starting from
-  // top (12 o'clock) going clockwise. svg's stroke-dashoffset on a circle
-  // also starts at 3 o'clock by default; we rotate -90° to align with top.
-  const angle = (clamped / 100) * 2 * Math.PI - Math.PI / 2;
-  const knobX = cx + r * Math.cos(angle);
-  const knobY = cy + r * Math.sin(angle);
+  // 원본 RadialGauge: 완전한 원이 아니라 270° 열린 arc.
+  // 시작 좌하단(-225°) → 윗쪽을 지나 → 끝 우하단(+45°), 아래가 비어 있음.
+  const START_DEG = -225;
+  const SWEEP_DEG = 270;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const arcLen = r * toRad(SWEEP_DEG);
+  const pt = (deg: number): [number, number] => {
+    const a = toRad(deg);
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  };
+  const [sx, sy] = pt(START_DEG);
+  const [ex, ey] = pt(START_DEG + SWEEP_DEG);
+  // largeArc=1 (270>180), sweep=1 (각도 증가 방향 = 윗쪽 경유)
+  const arcPath = `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 1 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+  const valueOffset = arcLen * (1 - frac);                 // start(좌하단)부터 frac 채움
+  const [knobX, knobY] = pt(START_DEG + SWEEP_DEG * frac); // value arc 끝점
 
   // Unique IDs so multiple gauges on the same page don't share gradients
   const uid = `rg-${gradient}-${size}-${Math.round(value * 10)}`;
 
   return (
     <div style={{ position: 'relative', width: size, height: size + 28, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <svg width={size} height={size} style={{ overflow: 'visible' }}>
+      {/* 배경 halo — 원본: radial-gradient + halo-pulse */}
+      {showHalo && (
+        <div
+          style={{
+            position: 'absolute',
+            top: (size - size * 0.92) / 2,
+            left: (size - size * 0.92) / 2,
+            width: size * 0.92,
+            height: size * 0.92,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${from}33 0%, ${to}10 55%, transparent 75%)`,
+            animation: 'rada-halo-pulse 3.2s ease-in-out infinite',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      <svg width={size} height={size} style={{ overflow: 'visible', position: 'relative' }}>
         <defs>
           <linearGradient id={`${uid}-arc`} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor={from} />
             <stop offset="100%" stopColor={to} />
           </linearGradient>
-          <radialGradient id={`${uid}-halo`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={from} stopOpacity={0.55} />
-            <stop offset="60%" stopColor={to} stopOpacity={0.25} />
-            <stop offset="100%" stopColor={to} stopOpacity={0} />
-          </radialGradient>
-          <filter id={`${uid}-haloblur`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation={size * 0.06} />
-          </filter>
         </defs>
 
-        {/* Halo — pulsing soft glow behind the gauge */}
-        {showHalo && (
-          <g style={{
-            transformOrigin: `${cx}px ${cy}px`,
-            animation: 'rada-halo-pulse 3.2s ease-in-out infinite',
-          }}>
-            <circle
-              cx={cx}
-              cy={cy}
-              r={haloR}
-              fill={`url(#${uid}-halo)`}
-              filter={`url(#${uid}-haloblur)`}
-            />
-          </g>
-        )}
-
-        {/* Dotted orbit — slowly rotating ring outside the gauge */}
+        {/* 바깥 점선 orbit — 천천히 회전 (원본: rada-spin 28s, dash "4 9") */}
         {showOrbit && (
-          <g style={{
-            transformOrigin: `${cx}px ${cy}px`,
-            animation: 'rada-blob-rotate-cw 28s linear infinite',
-          }}>
-            <circle
-              cx={cx}
-              cy={cy}
-              r={orbitR}
-              fill="none"
-              stroke={from}
-              strokeOpacity={0.35}
-              strokeWidth={1.2}
-              strokeDasharray="2 6"
-            />
+          <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'rada-blob-rotate-cw 28s linear infinite' }}>
+            <circle cx={cx} cy={cy} r={orbitR} fill="none" stroke={from}
+              strokeOpacity={0.28} strokeWidth={1.4} strokeDasharray="4 9" />
           </g>
         )}
 
-        {/* Track — light gray ring */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke="#eef0f7"
-          strokeWidth={stroke}
-        />
+        {/* track — 270° 회색 arc */}
+        <path d={arcPath} fill="none" stroke="#eef0f7" strokeWidth={stroke} strokeLinecap="round" />
 
-        {/* Progress arc — gradient stroke */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={`url(#${uid}-arc)`}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${cx} ${cy})`}
-          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-        />
+        {/* value arc — gradient, 좌하단부터 frac 만큼 채움 */}
+        <path d={arcPath} fill="none" stroke={`url(#${uid}-arc)`} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={arcLen} strokeDashoffset={valueOffset}
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
 
-        {/* Flowing dash overlay — bright shimmer that travels around the arc.
-            Implemented as a circle with a short dash + huge gap, animated by
-            stroke-dashoffset so the visible chunk slides along. */}
+        {/* 흐르는 dash — arc 위 하이라이트가 흐름 (원본: animate dashoffset 2.6s) */}
         {showFlowDash && (
-          <circle
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill="none"
-            stroke="#ffffff"
-            strokeOpacity={0.85}
-            strokeWidth={stroke * 0.35}
-            strokeLinecap="round"
-            strokeDasharray={`${stroke * 1.5} ${circ}`}
-            transform={`rotate(-90 ${cx} ${cy})`}
-            style={{
-              animation: 'rada-dash-flow 2.6s linear infinite',
-              // Bind keyframe variable for offset target.
-              ['--rg-circ' as any]: `${circ}px`,
-            }}
-          />
+          <path d={arcPath} fill="none" stroke={to} strokeOpacity={0.55}
+            strokeWidth={stroke * 0.4} strokeLinecap="round"
+            strokeDasharray={`${(stroke * 1.4).toFixed(1)} ${arcLen.toFixed(1)}`}>
+            <animate attributeName="stroke-dashoffset" from={arcLen.toFixed(1)} to="0"
+              dur="2.6s" repeatCount="indefinite" />
+          </path>
         )}
 
-        {/* Endpoint knob — colored circle with white inner dot */}
-        <circle cx={knobX} cy={knobY} r={stroke * 0.55} fill={to} stroke="#ffffff" strokeWidth={2} />
+        {/* 끝점 knob — 색 원 + 흰 내부 (원본: outer thickness*0.85, inner *0.45) */}
+        <circle cx={knobX} cy={knobY} r={stroke * 0.85} fill={to} stroke="#ffffff" strokeWidth={2} />
         {showCenterDot && (
-          <circle cx={knobX} cy={knobY} r={stroke * 0.2} fill="#ffffff" />
+          <circle cx={knobX} cy={knobY} r={stroke * 0.45} fill="#ffffff" />
         )}
 
-        {/* Center value */}
-        <text
-          x={cx}
-          y={cy}
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{
-            fontFamily: FONT_UI,
-            fontSize: size * 0.22,
-            fontWeight: 700,
-            fill: '#0d1226',
-            letterSpacing: '-0.03em',
-          }}
-        >
+        {/* 중앙 값 */}
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
+          style={{ fontFamily: FONT_UI, fontSize: size * 0.24, fontWeight: 700, fill: '#0d1226', letterSpacing: '-0.03em' }}>
           {clamped.toFixed(1)}
           <tspan style={{ fontSize: size * 0.12, fontWeight: 500, fill: '#52587a' }}>%</tspan>
         </text>
