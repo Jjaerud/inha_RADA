@@ -1,0 +1,7 @@
+node_modules/
+*.tsbuildinfo
+.cache/
+
+# dist/ is intentionally committed so NCP VM can `git pull` without
+# requiring Node + npm install + build on the server. Re-build with
+# `npm run build` whenever component code changes.

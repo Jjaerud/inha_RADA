@@ -1,0 +1,247 @@
+import React, { useEffect, useMemo } from 'react';
+import { PanelProps } from '@grafana/data';
+import { VerdictRibbonOptions, RibbonSegment, DEFAULT_SEGMENTS_JSON } from '../types';
+import { injectSharedStyles } from '../inject';
+
+interface Props extends PanelProps<VerdictRibbonOptions> {}
+
+const FONT_UI = '"Space Grotesk", system-ui, -apple-system, sans-serif';
+const FONT_MONO = '"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace';
+
+// HSL-based color shift — varies lightness while keeping hue stable so each
+// segment's pulse stays in its OWN color family (not bleached white).
+function shiftLightness(hex: string, deltaL: number): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) {
+      h = (g - b) / d + (g < b ? 6 : 0);
+    } else if (max === g) {
+      h = (b - r) / d + 2;
+    } else {
+      h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+  const newL = Math.min(1, Math.max(0, l + deltaL));
+  const hueToRgb = (p: number, q: number, t: number): number => {
+    if (t < 0) { t += 1; }
+    if (t > 1) { t -= 1; }
+    if (t < 1 / 6) { return p + (q - p) * 6 * t; }
+    if (t < 1 / 2) { return q; }
+    if (t < 2 / 3) { return p + (q - p) * (2 / 3 - t) * 6; }
+    return p;
+  };
+  let nr: number; let ng: number; let nb: number;
+  if (s === 0) {
+    nr = ng = nb = Math.round(newL * 255);
+  } else {
+    const q = newL < 0.5 ? newL * (1 + s) : newL + s - newL * s;
+    const p = 2 * newL - q;
+    nr = Math.round(hueToRgb(p, q, h + 1 / 3) * 255);
+    ng = Math.round(hueToRgb(p, q, h) * 255);
+    nb = Math.round(hueToRgb(p, q, h - 1 / 3) * 255);
+  }
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+function parseSegments(jsonStr: string): RibbonSegment[] {
+  try {
+    const arr = JSON.parse(jsonStr);
+    if (Array.isArray(arr)) {
+      return arr
+        .filter((s) => s && typeof s === 'object')
+        .map((s, i) => ({
+          name: String(s.name ?? `Segment ${i + 1}`),
+          count: Number(s.count) || 0,
+          color: String(s.color ?? '#888'),
+          colorTo: s.colorTo ? String(s.colorTo) : undefined,
+        }))
+        .filter((s) => s.count > 0);
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+function extractSegments(data: PanelProps['data'], options: VerdictRibbonOptions): RibbonSegment[] {
+  const out: RibbonSegment[] = [];
+  for (const frame of data.series) {
+    const findF = (n: string) => frame.fields.find((f) => f.name === n);
+    const nameF = findF(options.nameField);
+    const countF = findF(options.countField);
+    const colorF = findF(options.colorField);
+    if (!nameF || !countF) {
+      continue;
+    }
+    for (let i = 0; i < frame.length; i++) {
+      const count = Number(countF.values[i]) || 0;
+      if (count <= 0) {
+        continue;
+      }
+      out.push({
+        name: String(nameF.values[i] ?? ''),
+        count,
+        color: colorF ? String(colorF.values[i] ?? '#888') : '#888',
+      });
+    }
+  }
+  return out;
+}
+
+export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, height }) => {
+  useEffect(() => { injectSharedStyles(); }, []);
+
+  const segments = useMemo(() => {
+    if (options.demoMode) {
+      return parseSegments(options.segmentsJson || DEFAULT_SEGMENTS_JSON);
+    }
+    const live = extractSegments(data, options);
+    return live.length > 0 ? live : parseSegments(options.segmentsJson || DEFAULT_SEGMENTS_JSON);
+  }, [data.series, options]);
+
+  const total = segments.reduce((s, x) => s + x.count, 0) || 1;
+
+  // "비정상" = everything except Normal (case-insensitive name match)
+  const abnormal = segments
+    .filter((s) => s.name.toLowerCase() !== 'normal' && s.name !== '정상')
+    .reduce((s, x) => s + x.count, 0);
+  const abnormalPct = Math.round((abnormal / total) * 100);
+
+  return (
+    <div
+      style={{
+        width,
+        height,
+        background: `
+          radial-gradient(ellipse 140% 110% at 100% 0%, rgba(59,130,246,0.22) 0%, transparent 78%),
+          linear-gradient(135deg, #ffffff 0%, #fafbff 100%)
+        `,
+        borderRadius: 18,
+        border: '1px solid rgba(15,20,50,0.06)',
+        boxShadow: '0 1px 3px rgba(15,20,50,0.04), 0 8px 32px rgba(15,20,50,0.06)',
+        overflow: 'hidden',
+        fontFamily: FONT_UI,
+        padding: '18px 22px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      {/* Header */}
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0d1226', letterSpacing: '-0.01em' }}>
+          {options.title}
+        </div>
+        {options.subtitle && (
+          <div style={{ fontSize: 11.5, color: '#8b91ad', marginTop: 4, fontWeight: 500 }}>
+            {options.subtitle}
+          </div>
+        )}
+      </div>
+
+      {/* Totals row */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          marginTop: 8,
+        }}
+      >
+        <div style={{ fontSize: 11.5, color: '#8b91ad', fontWeight: 500 }}>
+          전체 <span style={{ color: '#0d1226', fontWeight: 700 }}>{total}건</span>
+        </div>
+        {options.showAbnormalBadge && abnormal > 0 && (
+          <div style={{ fontSize: 11.5, color: '#f43f5e', fontWeight: 600 }}>
+            비정상 <span style={{ fontWeight: 700 }}>{abnormal}건</span> · {abnormalPct}%
+          </div>
+        )}
+      </div>
+
+      {/* Ribbon — stacked horizontal bars with phase-offset animated gradient */}
+      <div
+        style={{
+          display: 'flex',
+          width: '100%',
+          height: options.ribbonHeight,
+          borderRadius: options.ribbonHeight / 2,
+          overflow: 'hidden',
+          background: 'rgba(15,20,50,0.04)',
+          marginTop: 4,
+        }}
+      >
+        {segments.map((seg, i) => {
+          const pct = (seg.count / total) * 100;
+          // Two-color sweep — repeats colorFrom → colorTo → colorFrom so the
+          // background-position animation produces a continuous flow within
+          // the segment's OWN gradient pair (no white shine).
+          const cFrom = seg.color;
+          const cTo = seg.colorTo || shiftLightness(seg.color, +0.18);
+          const phase = (i * 0.6).toFixed(1);
+          return (
+            <div
+              key={i}
+              title={`${seg.name} · ${seg.count}`}
+              style={{
+                width: `${pct}%`,
+                height: '100%',
+                background: `linear-gradient(90deg, ${cFrom} 0%, ${cTo} 50%, ${cFrom} 100%)`,
+                backgroundSize: '200% 100%',
+                animation: options.animate
+                  ? `rada-ribbon-sweep ${options.pulseDurationSec}s ease-in-out infinite`
+                  : 'none',
+                animationDelay: `${phase}s`,
+                borderRight: i < segments.length - 1 ? '1px solid rgba(255,255,255,0.4)' : 'none',
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          marginTop: 10,
+        }}
+      >
+        {segments.map((seg, i) => {
+          const cTo = seg.colorTo || shiftLightness(seg.color, +0.18);
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  background: `linear-gradient(135deg, ${seg.color}, ${cTo})`,
+                  boxShadow: `0 0 0 2px ${seg.color}25`,
+                }}
+              />
+              <span style={{ fontFamily: FONT_UI, fontSize: 11.5, color: '#52587a', fontWeight: 500 }}>
+                {seg.name}
+              </span>
+              <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: '#0d1226', fontWeight: 700 }}>
+                {seg.count}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};

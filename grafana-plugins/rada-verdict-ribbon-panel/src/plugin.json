@@ -1,0 +1,16 @@
+{
+  "type": "panel",
+  "name": "RADA Verdict Ribbon",
+  "id": "rada-verdict-ribbon-panel",
+  "info": {
+    "description": "Animated stacked ribbon showing AI verdict distribution (Normal/Mining/Heavy/Error)",
+    "author": { "name": "RADA", "url": "https://github.com/Jjaerud/inha_RADA" },
+    "keywords": ["rada", "verdict", "ribbon", "ai"],
+    "logos": { "small": "img/logo.svg", "large": "img/logo.svg" },
+    "links": [{ "name": "GitHub", "url": "https://github.com/Jjaerud/inha_RADA" }],
+    "screenshots": [],
+    "version": "1.0.0",
+    "updated": "2026-05-27"
+  },
+  "dependencies": { "grafanaDependency": ">=10.0.0", "plugins": [] }
+}

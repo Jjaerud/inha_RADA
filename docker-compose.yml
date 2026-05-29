@@ -88,6 +88,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-pc_monitor}
       # Hexmap panel for the LAB-01 honeycomb grid on rada-main dashboard.
       GF_INSTALL_PLUGINS: marcusolsson-hexmap-panel
+      # Custom in-tree plugins are mounted from ./grafana-plugins/<id>/dist.
+      # Unsigned, so allow-list them.
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "rada-hexmap-panel,rada-blob-gauge-panel,rada-stat-card-panel,rada-concerns-panel,rada-verdict-ribbon-panel,rada-radial-gauges-panel"
       TZ: Asia/Seoul
     volumes:
       - ./infra/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
@@ -96,6 +99,14 @@ services:
       - ./infra/grafana/provisioning-docker/datasources:/etc/grafana/provisioning/datasources:ro
       - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./infra/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      # Mount custom panel plugins. Each subfolder must be the plugin id
+      # (matches plugin.json) and contain the build output.
+      - ./grafana-plugins/rada-hexmap-panel/dist:/var/lib/grafana/plugins/rada-hexmap-panel:ro
+      - ./grafana-plugins/rada-blob-gauge-panel/dist:/var/lib/grafana/plugins/rada-blob-gauge-panel:ro
+      - ./grafana-plugins/rada-stat-card-panel/dist:/var/lib/grafana/plugins/rada-stat-card-panel:ro
+      - ./grafana-plugins/rada-concerns-panel/dist:/var/lib/grafana/plugins/rada-concerns-panel:ro
+      - ./grafana-plugins/rada-verdict-ribbon-panel/dist:/var/lib/grafana/plugins/rada-verdict-ribbon-panel:ro
+      - ./grafana-plugins/rada-radial-gauges-panel/dist:/var/lib/grafana/plugins/rada-radial-gauges-panel:ro
       - rada_grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
