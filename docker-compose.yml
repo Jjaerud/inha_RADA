@@ -29,6 +29,13 @@ services:
     environment:
       RADA_POLICY_DIR: /app/ml_server/config_yaml
       TZ: Asia/Seoul
+      # 실제 Claude API 연결 — .env 의 ANTHROPIC_API_KEY 가 있으면 자동으로
+      # real claude 사용(키 없으면 mock). 모델/명시 토글은 선택.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      USE_REAL_CLAUDE: ${USE_REAL_CLAUDE:-}
+      CLAUDE_TIMEOUT_SEC: ${CLAUDE_TIMEOUT_SEC:-10}
+      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-500}
     ports:
       - "8000:8000"
     depends_on:

@@ -23,6 +23,20 @@ def test_use_real_claude_explicit_override(monkeypatch):
     assert config.use_real_claude() is False
 
 
+def test_use_real_claude_empty_override_falls_back_to_key(monkeypatch):
+    """USE_REAL_CLAUDE="" (빈값, docker-compose :- 주입) → 미설정 취급 →
+    키 존재 여부로 판단. 키 있으면 True (빈값이 mock 을 강제하지 않음)."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-xxx")
+    monkeypatch.setenv("USE_REAL_CLAUDE", "")
+    assert config.use_real_claude() is True
+
+
+def test_use_real_claude_empty_override_no_key_is_false(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("USE_REAL_CLAUDE", "")
+    assert config.use_real_claude() is False
+
+
 def test_get_anthropic_api_key_returns_none_when_unset(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert config.get_anthropic_api_key() is None

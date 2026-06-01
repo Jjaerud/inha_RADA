@@ -40,9 +40,14 @@ def get_anthropic_api_key() -> Optional[str]:
 
 
 def use_real_claude() -> bool:
-    """USE_REAL_CLAUDE 환경변수 명시 우선, 미설정 시 키 존재 여부."""
+    """USE_REAL_CLAUDE 환경변수 명시 우선, 미설정 시 키 존재 여부.
+
+    빈 문자열("")은 "미설정"으로 취급한다 — docker-compose 의
+    ``USE_REAL_CLAUDE: ${USE_REAL_CLAUDE:-}`` 처럼 빈값이 주입돼도 키가
+    있으면 실제 Claude 를 쓰도록(빈값이 mock 을 강제하지 않도록).
+    """
     override = os.getenv("USE_REAL_CLAUDE")
-    if override is not None:
+    if override:
         return override.lower() in ("1", "true", "yes", "on")
     return get_anthropic_api_key() is not None
 
