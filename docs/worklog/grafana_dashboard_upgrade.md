@@ -76,10 +76,39 @@ src/{plugin.json, types.ts, module.tsx, components/*.tsx, inject.ts, img/logo.sv
 - `install.bat` 이 입력받은 번호로 `pc_id: PC-NN` 기입 → 데이터가 PC-01/02/03 으로 들어옴.
 - collector_version 9.1.0 → **9.1.1**. 테스트 465 passed.
 
-## 6. 남은 작업 (커밋 전 완료 필요)
+## 6. 패널 정합성 점검 — 하드코딩/오표시 6건 (2026-05-29)
 
-- **하단 패널 2종 마무리**: 이상 탐지 피드, LAB 평균 자원
-- 그라데이션 미세 조정 등 개선사항 잔존
-- **실데이터 연결**: demoMode 해제 후 PostgreSQL/API 데이터소스 바인딩
-  (hexmap 은 쿼리·로스터 준비 완료 — demoMode off + fillToCount 40 만 설정하면 동작)
+운영 대시보드 리뷰에서 패널 텍스트가 실데이터와 어긋나는 6건 발견 후 수정.
+SQL 의 시간창(1h/5min)은 **전부 이미 맞았고**, 문제는 정적 텍스트와 컴포넌트 버그.
+
+### 검증 결과 (SQL 시간창 — 수정 불필요)
+- 이상 탐지 피드(패널30): `anomaly_history WHERE detected_at > now()-1h` ✓
+- AI 판단 분포(패널21): `ai_judgment_history WHERE judged_at > now()-1h` ✓
+- LAB 평균 자원(패널31): `metrics_history WHERE collected_at > now()-5min`, avg() ✓
+
+### 수정
+1. **이상 탐지 피드 — actionLabel 의 "→ Alerts" 제거**. 컴포넌트가
+   `전체 {rows.length}건` 을 이미 동적 렌더하므로 접미사만 제거(actionLabel="전체").
+2. **AI 판단 분포 — subtitle "· 25건" 하드코딩 제거** → "· 최근 1h".
+   본문 `전체 {total}건` 은 실데이터 합으로 이미 동적. segmentsJson 의 25건은
+   demoMode:false 라 미사용(혼동 방지 위해 subtitle 만 정리).
+3. **AI 판단 분포 — "전체 1건인데 그래프 안 나옴" 버그 수정** (verdict-ribbon):
+   `const total = reduce(...) || 1` 이 데이터 0건일 때 0→1 로 덮어써 헤더에
+   "전체 1건" 오표시 + ribbon 빈 바. 표시용 `total`(0 가능)과 나눗셈용
+   `denom = total || 1` 분리, 0건이면 "최근 1시간 판단 없음" 표기.
+4. **LAB 평균 자원 — subtitle "39대" 하드코딩 → 동적**. SQL 에
+   `count(DISTINCT pc_id) AS n_pcs` 추가, radial-gauges 에 `countField`/
+   `countWindowLabel` 옵션 신설 → "N대 평균 · 최근 5분" 동적 생성(전체 40대 중
+   보고 중인 N대). 데모/필드 부재 시 정적 subtitle fallback.
+5. **Top concerns — subtitle "클릭 → PC 상세"(미구현 동작) 제거** →
+   "심각도 높은 순 · 최근 1h · PC별 최신 1건"(실제 쿼리 동작 설명).
+6. (부수) Top concerns actionLabel "전체 6건" → "전체"(컴포넌트가 건수 동적 부착).
+
+### 빌드/검증
+- 컴포넌트 수정 2종(verdict-ribbon, radial-gauges) `npm run build` 성공.
+- 대시보드 JSON 유효성 확인. 로컬 docker 스택으로 렌더 검증.
+
+## 7. 남은 작업 (커밋 전 완료 필요)
+
+- 그라데이션 미세 조정 등 개선사항 잔존(있으면)
 - 메인 대시보드 완성 확정 시 **일괄 커밋**

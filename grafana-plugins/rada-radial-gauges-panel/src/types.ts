@@ -3,6 +3,11 @@ export type GaugeGradient = 'violet' | 'cool' | 'mint' | 'amber' | 'hot' | 'cyan
 export interface RadialGaugesOptions {
   title: string;
   subtitle: string;
+  // 평균에 포함된 PC 수를 담은 숫자 필드명(예: SQL 의 count(distinct pc_id)).
+  // 값이 있으면 subtitle 을 "N대 평균 · 최근 5분" 으로 동적 생성한다. 비우면
+  // 정적 subtitle 사용. (전체 40대 중 보고 중인 N대만 평균 — 하드코딩 방지)
+  countField: string;
+  countWindowLabel: string;      // 예: "최근 5분"
 
   // Gauge 1 / 2 / 3 — labels + value bindings + gradient theme
   g1Label: string;
@@ -31,7 +36,9 @@ export interface RadialGaugesOptions {
 
 export const defaultOptions: RadialGaugesOptions = {
   title: 'LAB 평균 자원',
-  subtitle: '39대 평균 · last 5m',
+  subtitle: '최근 5분 평균',
+  countField: 'n_pcs',
+  countWindowLabel: '최근 5분',
   g1Label: 'CPU',
   g1Field: 'cpu',
   g1Gradient: 'violet',

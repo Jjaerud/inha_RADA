@@ -111,13 +111,18 @@ export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, heig
     return extractSegments(data, options);
   }, [data.series, options]);
 
-  const total = segments.reduce((s, x) => s + x.count, 0) || 1;
+  // 표시용 합계(0 가능)와 나눗셈용 분모를 분리한다. 예전엔 `|| 1` 로 0 을
+  // 1 로 덮어써, 데이터 0건일 때 헤더에 "전체 1건" 이 뜨고 ribbon 은 그릴
+  // segment 가 없어 빈 바가 됐다 (= "전체 1건인데 그래프 안 나옴" 버그).
+  const total = segments.reduce((s, x) => s + x.count, 0);
+  const denom = total || 1;
 
   // "비정상" = everything except Normal (case-insensitive name match)
   const abnormal = segments
     .filter((s) => s.name.toLowerCase() !== 'normal' && s.name !== '정상')
     .reduce((s, x) => s + x.count, 0);
-  const abnormalPct = Math.round((abnormal / total) * 100);
+  const abnormalPct = Math.round((abnormal / denom) * 100);
+  const isEmpty = total === 0;
 
   return (
     <div
@@ -162,6 +167,7 @@ export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, heig
       >
         <div style={{ fontSize: 11.5, color: '#8b91ad', fontWeight: 500 }}>
           전체 <span style={{ color: '#0d1226', fontWeight: 700 }}>{total}건</span>
+          {isEmpty && <span style={{ marginLeft: 8, color: '#aeb4ce' }}>· 최근 1시간 판단 없음</span>}
         </div>
         {options.showAbnormalBadge && abnormal > 0 && (
           <div style={{ fontSize: 11.5, color: '#f43f5e', fontWeight: 600 }}>
@@ -183,7 +189,7 @@ export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, heig
         }}
       >
         {segments.map((seg, i) => {
-          const pct = (seg.count / total) * 100;
+          const pct = (seg.count / denom) * 100;
           // Two-color sweep — repeats colorFrom → colorTo → colorFrom so the
           // background-position animation produces a continuous flow within
           // the segment's OWN gradient pair (no white shine).

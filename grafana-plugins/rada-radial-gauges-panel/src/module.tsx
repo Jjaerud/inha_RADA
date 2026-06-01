@@ -14,7 +14,9 @@ const GRAD_OPTS: Array<SelectableValue<GaugeGradient>> = [
 export const plugin = new PanelPlugin<RadialGaugesOptions>(RadialGaugesPanel).setPanelOptions((builder) => {
   builder
     .addTextInput({ path: 'title', name: 'Title', defaultValue: defaultOptions.title })
-    .addTextInput({ path: 'subtitle', name: 'Subtitle', defaultValue: defaultOptions.subtitle })
+    .addTextInput({ path: 'subtitle', name: 'Subtitle (fallback)', description: 'countField 가 비었거나 데모일 때만 사용', defaultValue: defaultOptions.subtitle })
+    .addTextInput({ path: 'countField', name: 'PC count field', description: '평균에 포함된 PC 수 필드명(예: n_pcs). 있으면 subtitle 을 "N대 평균 · {window}" 로 동적 표시', defaultValue: defaultOptions.countField })
+    .addTextInput({ path: 'countWindowLabel', name: 'Count window label', defaultValue: defaultOptions.countWindowLabel })
     .addNumberInput({ path: 'gaugeSize', name: 'Max gauge size (px)', defaultValue: defaultOptions.gaugeSize, settings: { min: 60, max: 300 } });
 
   builder

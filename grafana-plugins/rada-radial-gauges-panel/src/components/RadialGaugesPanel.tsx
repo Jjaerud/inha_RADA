@@ -170,6 +170,15 @@ export const RadialGaugesPanel: React.FC<Props> = ({ data, options, width, heigh
   const v2 = options.demoMode ? options.g2Demo : (lookupValue(data.series, options.g2Field) ?? 0);
   const v3 = options.demoMode ? options.g3Demo : (lookupValue(data.series, options.g3Field) ?? 0);
 
+  // 동적 subtitle: countField(평균에 포함된 PC 수)가 데이터에 있으면
+  // "N대 평균 · {window}" 로 표시한다. 하드코딩 대수 방지(전체 40대 중 보고 N대).
+  const nPcs = options.demoMode || !options.countField
+    ? null
+    : lookupValue(data.series, options.countField);
+  const subtitle = nPcs != null
+    ? `${nPcs}대 평균 · ${options.countWindowLabel}`
+    : options.subtitle;
+
   // Auto-size gauges to fit horizontally (3 gauges + gaps) and not exceed
   // the panel's vertical space (also leaving room for header + label).
   const headerH = 70;
@@ -202,9 +211,9 @@ export const RadialGaugesPanel: React.FC<Props> = ({ data, options, width, heigh
         <div style={{ fontSize: 16, fontWeight: 700, color: '#0d1226', letterSpacing: '-0.01em' }}>
           {options.title}
         </div>
-        {options.subtitle && (
+        {subtitle && (
           <div style={{ fontSize: 11.5, color: '#8b91ad', marginTop: 4, fontWeight: 500 }}>
-            {options.subtitle}
+            {subtitle}
           </div>
         )}
       </div>

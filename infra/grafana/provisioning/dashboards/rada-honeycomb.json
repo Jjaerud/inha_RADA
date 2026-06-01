@@ -297,8 +297,8 @@
       ],
       "options": {
         "title": "Top concerns · live",
-        "subtitle": "severity desc · 클릭 → PC 상세",
-        "actionLabel": "전체 6건",
+        "subtitle": "심각도 높은 순 · 최근 1h · PC별 최신 1건",
+        "actionLabel": "전체",
         "maxRows": 5,
         "cardTheme": "rose",
         "showDescription": false,
@@ -336,7 +336,7 @@
       ],
       "options": {
         "title": "AI 판단 분포 · 1h",
-        "subtitle": "ai_judgment_history · 25건",
+        "subtitle": "ai_judgment_history · 최근 1h",
         "ribbonHeight": 22,
         "showAbnormalBadge": true,
         "animate": true,
@@ -373,7 +373,7 @@
       "options": {
         "title": "이상 탐지 피드",
         "subtitle": "anomaly_history · 1h · live",
-        "actionLabel": "전체 6건 → Alerts",
+        "actionLabel": "전체",
         "maxRows": 3,
         "cardTheme": "amber",
         "showDescription": true,
@@ -406,12 +406,14 @@
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT\n  round(avg(cpu_percent)::numeric, 1) AS cpu,\n  round(avg(gpu_percent)::numeric, 1) AS gpu,\n  round(avg(mem_percent)::numeric, 1) AS mem\nFROM pc_monitor.metrics_history\nWHERE collected_at > now() - interval '5 minutes'"
+          "rawSql": "SELECT\n  round(avg(cpu_percent)::numeric, 1) AS cpu,\n  round(avg(gpu_percent)::numeric, 1) AS gpu,\n  round(avg(mem_percent)::numeric, 1) AS mem,\n  count(DISTINCT pc_id)::int AS n_pcs\nFROM pc_monitor.metrics_history\nWHERE collected_at > now() - interval '5 minutes'"
         }
       ],
       "options": {
         "title": "LAB 평균 자원",
-        "subtitle": "39대 평균 · last 5m",
+        "subtitle": "최근 5분 평균",
+        "countField": "n_pcs",
+        "countWindowLabel": "최근 5분",
         "gaugeSize": 130,
         "g1Label": "CPU",
         "g1Field": "cpu",
