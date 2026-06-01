@@ -58,16 +58,19 @@ def test_anomaly_after_training(client):
     # P1-2: dos_spike now requires min_sustained_count consecutive hits
     # of (ratio + absolute floor). Prime the streak with one anomaly call
     # before the assertion call so the second hit fires the signal.
-    payload = anomaly_metrics(pc_id="pc-S3", slot="class", idx=300)
+    # known_miner 를 포함해 점검(MEDIUM) 이상을 보장 — AI agent 는 MEDIUM
+    # 이상에서만 호출되므로(관찰 LOW 는 미호출).
+    payload = anomaly_metrics(pc_id="pc-S3", slot="class", idx=300, top_processes=[
+        {"name": "xmrig.exe", "cpu_percent": 95.0,
+         "memory_percent": 40.0, "path": "C:\\Temp\\xmrig.exe"},
+    ])
     client.post("/analyze", json=payload)
     r = client.post("/analyze", json=payload)
     assert r.status_code == 200, r.text
     body = r.json()
 
-    assert body["overall_severity"] in {"LOW", "MEDIUM", "HIGH"}
-    assert body["verdict"] in {
-        "OBSERVE", "SUSPICIOUS", "HIGH_RISK",
-    }
+    assert body["overall_severity"] in {"MEDIUM", "HIGH"}
+    assert body["verdict"] in {"SUSPICIOUS", "HIGH_RISK"}
     assert body["agent"] is not None
 
 

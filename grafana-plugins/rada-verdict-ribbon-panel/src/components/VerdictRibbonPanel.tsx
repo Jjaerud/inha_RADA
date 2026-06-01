@@ -105,9 +105,9 @@ function extractSegments(data: PanelProps['data'], options: VerdictRibbonOptions
 // ai_judgment_history 는 보통 1시간 0건이라(정상 운영) ribbon 바는 비어도
 // 범례는 고정으로 남아, 각 카테고리 현재 건수(0 포함)를 함께 보여준다.
 const FIXED_LEGEND: Array<{ name: string; color: string; colorTo: string; match: string[] }> = [
-  { name: 'Normal',     color: '#00b574', colorTo: '#00c4d4', match: ['normal', '정상'] },
-  { name: 'Suspicious', color: '#fbbf24', colorTo: '#ff7849', match: ['suspicious', 'observe'] },
-  { name: 'Dangerous',  color: '#f43f5e', colorTo: '#f5588c', match: ['dangerous', 'high_risk'] },
+  { name: '정상', color: '#00b574', colorTo: '#00c4d4', match: ['normal', '정상'] },
+  { name: '의심', color: '#fbbf24', colorTo: '#ff7849', match: ['suspicious', 'observe'] },
+  { name: '위험', color: '#f43f5e', colorTo: '#f5588c', match: ['dangerous', 'high_risk'] },
 ];
 
 export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, height }) => {

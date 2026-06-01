@@ -18,8 +18,11 @@ def test_mock_agent_when_no_api_key(client, monkeypatch):
     monkeypatch.setattr(runner, "USE_REAL_CLAUDE", False, raising=True)
 
     seed_history(client, pc_id="pc-AG1", slot="class", n=60)
-    # P1-2: prime dos_spike streak so the assertion call fires the signal.
-    payload = anomaly_metrics(pc_id="pc-AG1", slot="class", idx=300)
+    # known_miner 포함 → MEDIUM 이상 보장(agent 는 점검 이상만 호출).
+    payload = anomaly_metrics(pc_id="pc-AG1", slot="class", idx=300, top_processes=[
+        {"name": "xmrig.exe", "cpu_percent": 95.0,
+         "memory_percent": 40.0, "path": "C:\\Temp\\xmrig.exe"},
+    ])
     client.post("/analyze", json=payload)
     r = client.post("/analyze", json=payload)
     body = r.json()
@@ -39,6 +42,23 @@ def test_agent_skipped_on_normal(client, monkeypatch):
     assert body["agent"] is None
 
 
+def test_agent_skipped_on_observe(client, monkeypatch):
+    """관찰(LOW/OBSERVE)에선 agent 미호출 — 점검(MEDIUM) 이상만 AI 판단.
+
+    anomaly_metrics(known_miner 없음)는 final≈7 → OBSERVE/LOW 로 떨어진다.
+    새 정책상 MEDIUM 미만은 LLM 을 돌리지 않는다(Spring P0-1 이 어차피
+    LOW/OBSERVE 를 저장하지 않으므로 호출=낭비)."""
+    monkeypatch.setattr(runner, "USE_REAL_CLAUDE", False, raising=True)
+
+    seed_history(client, pc_id="pc-AGo", slot="class", n=60)
+    payload = anomaly_metrics(pc_id="pc-AGo", slot="class", idx=300)
+    client.post("/analyze", json=payload)
+    body = client.post("/analyze", json=payload).json()
+    # MEDIUM/HIGH 가 아니면(=관찰/정상) agent 는 호출되지 않는다.
+    assert body["overall_severity"] not in ("MEDIUM", "HIGH")
+    assert body["agent"] is None
+
+
 def test_claude_branch_invoked_when_enabled(client, monkeypatch):
     """USE_REAL_CLAUDE=True 일 때 call_claude_api 가 호출되어야 한다."""
     called = {"n": 0}
@@ -54,8 +74,11 @@ def test_claude_branch_invoked_when_enabled(client, monkeypatch):
     monkeypatch.setattr(runner, "call_claude_api", fake_call, raising=True)
 
     seed_history(client, pc_id="pc-AG3", slot="class", n=60)
-    # P1-2: prime dos_spike streak.
-    payload = anomaly_metrics(pc_id="pc-AG3", slot="class", idx=300)
+    # known_miner 포함 → MEDIUM 이상 보장(agent 는 점검 이상만 호출).
+    payload = anomaly_metrics(pc_id="pc-AG3", slot="class", idx=300, top_processes=[
+        {"name": "xmrig.exe", "cpu_percent": 95.0,
+         "memory_percent": 40.0, "path": "C:\\Temp\\xmrig.exe"},
+    ])
     client.post("/analyze", json=payload)
     r = client.post("/analyze", json=payload)
     body = r.json()

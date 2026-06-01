@@ -265,9 +265,12 @@ def analyze(metrics: MetricsRequest):
     except Exception:
         pass  # additive layer must never break the main path
 
-    # AI Agent
+    # AI Agent — 점검(MEDIUM) 이상만 호출.
+    # 관찰(LOW/OBSERVE)은 Spring(P0-1)이 어차피 저장하지 않으므로, LOW 에서
+    # LLM 을 돌리면 결과가 버려져 비용만 든다. 호출 기준을 저장/표시 기준
+    # (MEDIUM 이상)과 일치시킨다.
     agent_result = None
-    if pattern_result["overall_severity"] != "NORMAL":
+    if pattern_result["overall_severity"] in ("MEDIUM", "HIGH"):
         agent_result = run_ai_agent(metrics, pattern_result, global_hw)
 
     return _sanitize({

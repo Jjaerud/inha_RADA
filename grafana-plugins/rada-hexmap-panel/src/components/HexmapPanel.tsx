@@ -577,13 +577,16 @@ export const HexmapPanel: React.FC<Props> = ({ data, options, width, height }) =
           }}
         >
           {[
-            { sev: 0 as const, label: '정상' },
-            { sev: 1 as const, label: 'Low' },
-            { sev: 2 as const, label: '점검' },
-            { sev: 3 as const, label: '의심' },
-            { sev: -1 as const, label: 'Offline' },
+            // 정상 셀에 관찰(LOW)을 합산 표시 — LOW 는 저장/표시 대상이 아니라
+            // SQL 에서도 정상(0)으로 흡수되므로 범례도 정상에 통합한다.
+            { sev: 0 as const, label: '정상', extra: [1] as number[] },
+            { sev: 2 as const, label: '점검', extra: [] as number[] },
+            { sev: 3 as const, label: '위험', extra: [] as number[] },
+            { sev: -1 as const, label: '오프라인', extra: [] as number[] },
           ].map((it) => {
-            const count = cells.filter((c) => c.severity === it.sev).length;
+            const count = cells.filter(
+              (c) => c.severity === it.sev || it.extra.includes(c.severity as number)
+            ).length;
             const [a, b] = SEV_GRAD[String(it.sev) as keyof typeof SEV_GRAD];
             return (
               <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
