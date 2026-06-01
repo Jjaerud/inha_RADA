@@ -17,6 +17,9 @@ export interface ConcernsOptions {
   scoreField: string;
   minutesAgoField: string;
 
+  // 데이터 0건일 때 중앙에 표시할 안내 문구(허전함 방지). 비우면 기본 문구.
+  emptyText: string;
+
   // Demo
   demoMode: boolean;
 }
@@ -35,6 +38,7 @@ export const defaultOptions: ConcernsOptions = {
   showDescription: false,
   scoreField: 'score',
   minutesAgoField: 'minutes_ago',
+  emptyText: '표시할 항목이 없습니다',
   demoMode: false,
 };
 

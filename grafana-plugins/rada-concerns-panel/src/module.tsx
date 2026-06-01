@@ -7,6 +7,7 @@ export const plugin = new PanelPlugin<ConcernsOptions>(ConcernsPanel).setPanelOp
     .addTextInput({ path: 'title', name: 'Title', defaultValue: defaultOptions.title })
     .addTextInput({ path: 'subtitle', name: 'Subtitle', defaultValue: defaultOptions.subtitle })
     .addTextInput({ path: 'actionLabel', name: 'Action text (plain)', defaultValue: defaultOptions.actionLabel })
+    .addTextInput({ path: 'emptyText', name: 'Empty state text', description: '데이터 0건일 때 중앙에 표시할 문구', defaultValue: defaultOptions.emptyText })
     .addNumberInput({ path: 'maxRows', name: 'Max rows', defaultValue: defaultOptions.maxRows, settings: { min: 1, max: 20 } })
     .addRadio({
       path: 'cardTheme',

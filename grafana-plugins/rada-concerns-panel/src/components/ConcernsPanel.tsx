@@ -240,7 +240,36 @@ export const ConcernsPanel: React.FC<Props> = ({ data, options, width, height })
 
       {/* Rows */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 14px' }}>
-        {rows.slice(0, options.maxRows).map((r, i) => {
+        {rows.length === 0 ? (
+          // 데이터 0건 — 허전하지 않게 중앙에 안내(아이콘+문구). 이상 탐지가
+          // 없다는 건 긍정 상태이므로 체크 아이콘으로 표현.
+          <div
+            style={{
+              height: '100%',
+              minHeight: 96,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              color: '#aeb4ce',
+            }}
+          >
+            <div
+              style={{
+                width: 40, height: 40, borderRadius: 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(0,181,116,0.10)',
+                color: '#10b981', fontSize: 20, fontWeight: 800,
+              }}
+            >
+              ✓
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#8b91ad' }}>
+              {options.emptyText || '표시할 항목이 없습니다'}
+            </div>
+          </div>
+        ) : rows.slice(0, options.maxRows).map((r, i) => {
           const c = SEV_COLOR[String(r.severity)] || SEV_COLOR['0'];
           const sevLabel = SEV_LABEL[String(r.severity)] || '';
           const sevBg = SEV_PILL_BG[String(r.severity)] || 'rgba(0,0,0,0.04)';
