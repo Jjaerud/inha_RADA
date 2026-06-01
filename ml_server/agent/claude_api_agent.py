@@ -132,7 +132,31 @@ def call_claude_api(prompt: str) -> dict:
               "messages": [{"role": "user", "content": prompt}]},
         timeout=get_claude_timeout_sec(),
     )
-    return json.loads(response.json()["content"][0]["text"])
+    text = response.json()["content"][0]["text"]
+    return _parse_json_response(text)
+
+
+def _parse_json_response(raw: str) -> dict:
+    """Claude 응답 텍스트에서 JSON 추출. 순수 JSON 이 아니어도 견고하게 파싱.
+
+    Claude 는 지시에도 불구하고 ```json ... ``` 코드펜스로 감싸거나 앞뒤에
+    설명을 덧붙일 수 있다. 그대로 json.loads 하면 깨져 mock 으로 fallback
+    되므로(실측), 코드펜스를 벗기고 본문에서 첫 '{' ~ 마지막 '}' 를 추출한다.
+    """
+    import json
+    import re
+
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
+        text = re.sub(r"\s*```$", "", text).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            return json.loads(m.group(0))
+        raise
 
 
 class ClaudeApiAgent:
