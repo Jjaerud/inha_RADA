@@ -101,13 +101,15 @@ function extractSegments(data: PanelProps['data'], options: VerdictRibbonOptions
 
 // 고정 범례 — 데이터 유무와 무관하게 항상 표시한다(색 의미 가이드).
 // 카테고리/색은 패널 SQL 의 verdict→color CASE 와 일치시킨다:
-//   NORMAL→#00b574, SUSPICIOUS→#fbbf24, DANGEROUS/HIGH_RISK→#f43f5e.
+//   NORMAL→#00b574, SUSPICIOUS→#fbbf24, DANGEROUS/HIGH_RISK→#f43f5e,
+//   기타(HW 노후/오류, hw_degradation SUSPECTED/CONFIRMED)→#3b82f6.
 // ai_judgment_history 는 보통 1시간 0건이라(정상 운영) ribbon 바는 비어도
 // 범례는 고정으로 남아, 각 카테고리 현재 건수(0 포함)를 함께 보여준다.
 const FIXED_LEGEND: Array<{ name: string; color: string; colorTo: string; match: string[] }> = [
   { name: '정상', color: '#00b574', colorTo: '#00c4d4', match: ['normal', '정상'] },
   { name: '의심', color: '#fbbf24', colorTo: '#ff7849', match: ['suspicious', 'observe'] },
   { name: '위험', color: '#f43f5e', colorTo: '#f5588c', match: ['dangerous', 'high_risk'] },
+  { name: '기타', color: '#3b82f6', colorTo: '#6d4cff', match: ['기타', 'hw', 'hw_error'] },
 ];
 
 export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, height }) => {

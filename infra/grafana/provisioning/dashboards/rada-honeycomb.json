@@ -331,7 +331,7 @@
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT\n  COALESCE(judgment, verdict, 'NORMAL') AS verdict,\n  count(*) AS count,\n  CASE upper(COALESCE(judgment, verdict, 'NORMAL'))\n    WHEN 'NORMAL' THEN '#00b574'\n    WHEN 'SUSPICIOUS' THEN '#fbbf24'\n    WHEN 'DANGEROUS' THEN '#f43f5e'\n    WHEN 'HIGH_RISK' THEN '#f43f5e'\n    ELSE '#6d4cff' END AS color\nFROM pc_monitor.ai_judgment_history\nWHERE judged_at > now() - interval '1 hour'\nGROUP BY COALESCE(judgment, verdict, 'NORMAL'), upper(COALESCE(judgment, verdict, 'NORMAL'))\nORDER BY count DESC"
+          "rawSql": "SELECT\n  CASE\n    WHEN upper(COALESCE(judgment, verdict, 'NORMAL')) IN ('DANGEROUS','HIGH_RISK') THEN 'DANGEROUS'\n    WHEN upper(COALESCE(details->>'hw_degradation', 'NONE')) IN ('SUSPECTED','CONFIRMED') THEN '기타'\n    WHEN upper(COALESCE(judgment, verdict, 'NORMAL')) = 'SUSPICIOUS' THEN 'SUSPICIOUS'\n    WHEN upper(COALESCE(judgment, verdict, 'NORMAL')) = 'NORMAL' THEN 'NORMAL'\n    ELSE '기타'\n  END AS verdict,\n  count(*) AS count,\n  CASE\n    WHEN upper(COALESCE(judgment, verdict, 'NORMAL')) IN ('DANGEROUS','HIGH_RISK') THEN '#f43f5e'\n    WHEN upper(COALESCE(details->>'hw_degradation', 'NONE')) IN ('SUSPECTED','CONFIRMED') THEN '#3b82f6'\n    WHEN upper(COALESCE(judgment, verdict, 'NORMAL')) = 'SUSPICIOUS' THEN '#fbbf24'\n    WHEN upper(COALESCE(judgment, verdict, 'NORMAL')) = 'NORMAL' THEN '#00b574'\n    ELSE '#3b82f6'\n  END AS color\nFROM pc_monitor.ai_judgment_history\nWHERE judged_at > now() - interval '1 hour'\nGROUP BY 1, 3\nORDER BY count DESC"
         }
       ],
       "options": {
