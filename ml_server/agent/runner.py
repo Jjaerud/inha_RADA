@@ -9,8 +9,24 @@ from .mock_agent import mock_agent_judgment
 # 형태로 분기를 강제하므로 모듈 변수로 노출. 실제 결정은 _should_use_claude().
 USE_REAL_CLAUDE = False
 
+# 런타임 토글 — 운영자가 비용 절감 등을 위해 실제 AI(Claude) 호출을 잠시
+# 끌 수 있다. True 면 키가 있어도 mock 판정만 사용(LLM 호출 0). 컨테이너
+# 재시작 시 기본(환경/키 따름)으로 복귀한다. POST /agent/enabled 로 제어.
+_RUNTIME_AI_DISABLED = False
+
+
+def set_ai_enabled(enabled: bool) -> None:
+    global _RUNTIME_AI_DISABLED
+    _RUNTIME_AI_DISABLED = not bool(enabled)
+
+
+def is_ai_enabled() -> bool:
+    return not _RUNTIME_AI_DISABLED
+
 
 def _should_use_claude() -> bool:
+    if _RUNTIME_AI_DISABLED:
+        return False  # 런타임으로 꺼짐 → mock 강제(비용 0)
     if globals().get("USE_REAL_CLAUDE"):
         return True
     return config.use_real_claude()

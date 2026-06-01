@@ -80,8 +80,8 @@ def build_prompt(metrics: MetricsRequest, pattern_result: dict,
             f"근거={ec.get('reasons', [])}"
         )
 
-    return f"""당신은 학교 실습실 PC 보안 및 유지보수 분석 전문가입니다.
-아래 데이터를 분석해 이상 여부를 판단하고 JSON으로만 응답하세요.
+    return f"""당신은 공용 PC 보안 및 유지보수 분석 전문가입니다.
+아래 데이터를 분석해 이상 여부를 판단하고 report_judgment 도구로 보고하세요.
 
 [현재 메트릭]
 PC={metrics.pc_id}, 시각={metrics.timestamp}, 시간표={pattern_result['timetable_slot']}
@@ -103,10 +103,8 @@ verdict={verdict} (NORMAL|OBSERVE|SUSPICIOUS|HIGH_RISK), 최종점수={scores.ge
 {procs_text}
 {conn_owner_text}
 
-JSON 형식으로만 응답:
-{{"judgment":"NORMAL|SUSPICIOUS|DANGEROUS","severity":"LOW|MEDIUM|HIGH",
-  "reason":"판단근거(2~3문장)","action":"추천조치",
-  "hw_degradation":"NONE|SUSPECTED|CONFIRMED"}}""".strip()
+판단 결과를 report_judgment 도구로 보고하세요.
+(reason 은 1~2문장 간결히, action 은 1문장)""".strip()
 
 
 def call_claude_api(prompt: str) -> dict:
@@ -122,6 +120,9 @@ def call_claude_api(prompt: str) -> dict:
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not configured")
 
+    # Tool use(structured output): JSON 스키마를 도구로 강제해 Claude 가 항상
+    # 유효한 구조화 출력을 반환하게 한다. 텍스트 파싱 시 ```json 코드펜스나
+    # escape 누락으로 깨져 mock 으로 fallback 되던 문제를 근본 제거.
     response = req.post(
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": api_key,
@@ -129,34 +130,38 @@ def call_claude_api(prompt: str) -> dict:
                  "content-type": "application/json"},
         json={"model": get_claude_model(),
               "max_tokens": get_claude_max_tokens(),
+              "tools": [_JUDGMENT_TOOL],
+              "tool_choice": {"type": "tool", "name": "report_judgment"},
               "messages": [{"role": "user", "content": prompt}]},
         timeout=get_claude_timeout_sec(),
     )
-    text = response.json()["content"][0]["text"]
-    return _parse_json_response(text)
+    data = response.json()
+    for block in data.get("content", []):
+        if block.get("type") == "tool_use" and block.get("name") == "report_judgment":
+            return dict(block.get("input") or {})
+    # tool_use 가 없으면(이례적) 명시적 에러 — runner 가 mock 으로 fallback.
+    raise ValueError(f"no tool_use in Claude response: {str(data)[:200]}")
 
 
-def _parse_json_response(raw: str) -> dict:
-    """Claude 응답 텍스트에서 JSON 추출. 순수 JSON 이 아니어도 견고하게 파싱.
-
-    Claude 는 지시에도 불구하고 ```json ... ``` 코드펜스로 감싸거나 앞뒤에
-    설명을 덧붙일 수 있다. 그대로 json.loads 하면 깨져 mock 으로 fallback
-    되므로(실측), 코드펜스를 벗기고 본문에서 첫 '{' ~ 마지막 '}' 를 추출한다.
-    """
-    import json
-    import re
-
-    text = (raw or "").strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
-        text = re.sub(r"\s*```$", "", text).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            return json.loads(m.group(0))
-        raise
+# Structured-output 스키마. messages API 의 tools 파라미터로 전달.
+_JUDGMENT_TOOL = {
+    "name": "report_judgment",
+    "description": "공용 PC 이상 분석의 최종 판단을 보고한다.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "judgment": {"type": "string", "enum": ["NORMAL", "SUSPICIOUS", "DANGEROUS"],
+                         "description": "종합 판정"},
+            "severity": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"],
+                         "description": "심각도"},
+            "reason": {"type": "string", "description": "판단 근거를 한국어 1~2문장으로 간결히(최대 120자)."},
+            "action": {"type": "string", "description": "구체적 추천 조치를 한국어 1문장으로(최대 60자)."},
+            "hw_degradation": {"type": "string", "enum": ["NONE", "SUSPECTED", "CONFIRMED"],
+                               "description": "하드웨어 노후/오류 여부"},
+        },
+        "required": ["judgment", "severity", "reason", "action", "hw_degradation"],
+    },
+}
 
 
 class ClaudeApiAgent:
