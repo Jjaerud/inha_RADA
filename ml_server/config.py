@@ -101,11 +101,14 @@ MINING_PROCESSES = {
     "bfgminer","ethminer","claymore",
 }
 
-MINING_POOL_IPS = {
-    "155.138.", "66.228.", "45.79.",
-    "64.76.", "209.222.",
-    "101.251.", "39.104.",
-}
+# mining_pool_ip 신호는 FP 과다로 비활성화(목록을 비움).
+# 기존 2-octet prefix(155.138.=Vultr, 45.79./66.228.=Linode, 39.104.=Alibaba 등)
+# 는 채굴풀이 아니라 정상 클라우드 /16 대역 전체를 매칭해, chrome/claude/codex
+# 등 일반 클라우드 트래픽을 채굴풀로 오인했다(실측 FP: PC-01 HIGH_RISK).
+# 코드 로직(mining_pool_hit)은 그대로 두므로, 정확한 채굴풀 IP나 위협 인텔
+# 피드가 생기면 여기 prefix 를 채우는 것만으로 재활성된다.
+# 채굴 탐지는 known_miner(프로세스명) + 지속 행동(gpu_flat/cpu_flat 등)으로 수행.
+MINING_POOL_IPS: set = set()
 # 별칭 (스펙)
 POOL_IPS = MINING_POOL_IPS
 

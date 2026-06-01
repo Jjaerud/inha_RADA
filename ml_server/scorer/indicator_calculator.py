@@ -169,7 +169,7 @@ def calculate_indicators(signals: Dict[str, Any], slot: str,
     if signals.get("unknown_process_active") and signals.get("net_out_sustained"):
         correlation += _sc.get("unknown_proc_net", 5)
     if signals.get("appdata_exec") and signals.get("net_out_sustained"):
-        correlation += _sc.get("appdata_net", 6)
+        correlation += _sc.get("appdata_net", 3)
     if signals.get("mining_process_or_pool"):
         # process or pool: mining_process_or_pool 자체 신호
         if signals["known_miner"]:

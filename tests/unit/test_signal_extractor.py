@@ -51,7 +51,19 @@ def test_known_miner_signal_triggers_on_xmrig():
     assert len(pack["known_miners"]) == 1
 
 
-def test_mining_pool_ip_detection():
+def test_mining_pool_ip_disabled_by_default():
+    # MINING_POOL_IPS 는 FP 과다(2-octet 클라우드 대역 오탐)로 기본 비활성(빈 set).
+    # 정상 클라우드 IP 가 와도 mining_pool_ip 는 발화하지 않는다.
+    metrics = make_metrics(external_connections=[{"ip": "155.138.99.1"}])
+    pack = extract_signals(metrics, deque(), slot="free")
+    assert pack["signals"]["mining_pool_ip"] is False
+    assert pack["mining_pool_ip_str"] == ""
+
+
+def test_mining_pool_ip_logic_still_works_when_configured(monkeypatch):
+    # 코드 로직은 유효 — 정확한 prefix 를 채우면 매칭된다(위협 인텔 피드 도입 대비).
+    import ml_server.scorer.signal_extractor as se
+    monkeypatch.setattr(se, "MINING_POOL_IPS", {"155.138."})
     metrics = make_metrics(external_connections=[{"ip": "155.138.99.1"}])
     pack = extract_signals(metrics, deque(), slot="free")
     assert pack["signals"]["mining_pool_ip"] is True

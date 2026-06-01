@@ -330,3 +330,28 @@ Spring AlertServiceTest 통과.
 - 수정: 6개 stub 에 `implemented: false` + 주석. 헤더에 enabled vs implemented
   구분 + SSOT(`pattern_categories._STUB_PATTERNS`) 명시. 코드 동작 무변(런타임
   응답 `category_signals.enabled_but_unimplemented` 로도 이미 노출 중).
+
+---
+
+## 운영 FP 튜닝 (2026-06-01) — mining_pool_ip / unknown / appdata
+
+NCP 실데이터에서 PC-01(개발자 PC: chrome/claude.exe/Codex.exe)이 채굴
+프로세스 없이 HIGH_RISK + MINING_SUSPICION 으로 반복 오탐. 원인 3종 복합:
+
+1. **mining_pool_ip — 비활성(목록 비움)**: `MINING_POOL_IPS` 가 2-octet
+   prefix(155.138.=Vultr, 45.79./66.228.=Linode, 39.104.=Alibaba)로 정상
+   클라우드 /16 대역 전체를 매칭 → correlation `mining_pool_only` 8점이
+   final 을 14점으로 밀어 HIGH. `config.MINING_POOL_IPS = set()` 로 비활성화
+   (로직 유지 — 정확 IP/위협 인텔 피드 생기면 재활성). 채굴 탐지는
+   known_miner(프로세스명) + 지속 행동(gpu_flat 등)이 담당.
+2. **unknown_process_active 임계 50→80%**: 정상 고부하 앱(개발도구 등)이
+   50~80% 쓰는 구간 제외. 채굴은 ~100% 라 80 으로도 탐지.
+3. **appdata_net correlation 6→3**: 정상 설치본/업데이터가 temp/appdata 에서
+   자주 실행 → 가중치만 하향(제거 X, 악성 temp 드롭 evidence 보존).
+
+검증: 전체 **482 passed**. mining_pool_ip 는 빈 목록이면 미발화 +
+prefix 채우면 매칭(로직 유효) 단위테스트로 확인. sustained 채굴 시나리오
+(known_miner HIGH 등)는 프로세스/행동 기반이라 불변.
+
+> 핵심 원칙: "단순 문자열/prefix 매칭"(IP·경로·프로세스명) 신호는 FP 후보.
+> known_miner(정확 채굴기명) / confirmed_sustained(180분 행동)는 근거가 강해 유지.

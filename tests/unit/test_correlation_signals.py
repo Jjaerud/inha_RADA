@@ -43,7 +43,7 @@ def test_unknown_process_net_out_correlation_plus_5():
     h = _seed_history()
     m = _metrics(
         outbound_mb=2.0,
-        top_processes=[{"name": "weird.exe", "cpu_percent": 70,
+        top_processes=[{"name": "weird.exe", "cpu_percent": 85,
                         "memory_percent": 5, "path": "C:\\misc\\weird.exe"}],
     )
     r = analyze_pattern(m, h, slot="class")

@@ -43,9 +43,10 @@ scores:
   cpu_plus_net: 2
   disk_write_net_out: 5
   unknown_proc_net: 5
-  appdata_net: 6
+  appdata_net: 3           # 6→3: 정상 설치본/업데이터가 temp/appdata 에서 자주
+                           # 실행돼 FP 유발 → 가중치만 하향(제거 X, 악성 temp 드롭 보존)
   mining_known: 10         # fast-path
-  mining_pool_only: 8
+  mining_pool_only: 8      # mining_pool_ip 비활성(MINING_POOL_IPS 빔)으로 사실상 미발화
 
 context_discounts:
   startup: -1

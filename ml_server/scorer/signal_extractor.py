@@ -182,11 +182,13 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
     # exec_path_suspicious = temp 또는 appdata
     exec_path_suspicious = bool(temp_exec) or bool(appdata_exec)
 
-    # unknown_process_active = top_processes 중 화이트리스트/마이너 외 cpu 50+ 프로세스
+    # unknown_process_active = top_processes 중 화이트리스트/마이너 외 cpu 80+ 프로세스
+    # (50→80: 정상 고부하 앱이 50~80% 쓰는 구간을 제외해 FP 저감. 채굴은 거의
+    #  100% 점유라 80 임계로도 탐지된다.)
     unknown_process_active = any(
         (p.get("name","").lower() not in whitelist_eff
          and p.get("name","").lower() not in MINING_PROCESSES
-         and float(p.get("cpu_percent", 0) or 0) >= 50.0)
+         and float(p.get("cpu_percent", 0) or 0) >= 80.0)
         for p in metrics.top_processes
     )
 
