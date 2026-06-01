@@ -99,6 +99,17 @@ function extractSegments(data: PanelProps['data'], options: VerdictRibbonOptions
   return out;
 }
 
+// 고정 범례 — 데이터 유무와 무관하게 항상 표시한다(색 의미 가이드).
+// 카테고리/색은 패널 SQL 의 verdict→color CASE 와 일치시킨다:
+//   NORMAL→#00b574, SUSPICIOUS→#fbbf24, DANGEROUS/HIGH_RISK→#f43f5e.
+// ai_judgment_history 는 보통 1시간 0건이라(정상 운영) ribbon 바는 비어도
+// 범례는 고정으로 남아, 각 카테고리 현재 건수(0 포함)를 함께 보여준다.
+const FIXED_LEGEND: Array<{ name: string; color: string; colorTo: string; match: string[] }> = [
+  { name: 'Normal',     color: '#00b574', colorTo: '#00c4d4', match: ['normal', '정상'] },
+  { name: 'Suspicious', color: '#fbbf24', colorTo: '#ff7849', match: ['suspicious', 'observe'] },
+  { name: 'Dangerous',  color: '#f43f5e', colorTo: '#f5588c', match: ['dangerous', 'high_risk'] },
+];
+
 export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, height }) => {
   useEffect(() => { injectSharedStyles(); }, []);
 
@@ -226,8 +237,11 @@ export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, heig
           marginTop: 10,
         }}
       >
-        {segments.map((seg, i) => {
-          const cTo = seg.colorTo || shiftLightness(seg.color, +0.18);
+        {FIXED_LEGEND.map((cat, i) => {
+          // 현재 분포(segments)에서 이 카테고리에 해당하는 건수 합산(없으면 0).
+          const cnt = segments
+            .filter((s) => cat.match.includes(s.name.toLowerCase()))
+            .reduce((a, s) => a + s.count, 0);
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span
@@ -235,15 +249,15 @@ export const VerdictRibbonPanel: React.FC<Props> = ({ data, options, width, heig
                   width: 9,
                   height: 9,
                   borderRadius: 999,
-                  background: `linear-gradient(135deg, ${seg.color}, ${cTo})`,
-                  boxShadow: `0 0 0 2px ${seg.color}25`,
+                  background: `linear-gradient(135deg, ${cat.color}, ${cat.colorTo})`,
+                  boxShadow: `0 0 0 2px ${cat.color}25`,
                 }}
               />
               <span style={{ fontFamily: FONT_UI, fontSize: 11.5, color: '#52587a', fontWeight: 500 }}>
-                {seg.name}
+                {cat.name}
               </span>
               <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: '#0d1226', fontWeight: 700 }}>
-                {seg.count}
+                {cnt}
               </span>
             </div>
           );
