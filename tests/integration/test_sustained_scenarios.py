@@ -87,6 +87,16 @@ def test_network_only_exfil_capped_to_observe(client):
     # 핵심 불변식: network-only 는 SUSPICIOUS 로 승격되지 않는다.
     assert last["verdict"] in ("NORMAL", "OBSERVE"), _summary(last)
     assert last["overall_severity"] in ("NORMAL", "LOW"), _summary(last)
+    # #1 alert 정합화: cap 이 실제로 발동했다면, 남은 alert 가 verdict 와
+    # 어긋나면 안 된다 (severity LOW/NORMAL 로 클램프 + capped 마킹).
+    if em.get("network_only_capped"):
+        for al in last.get("alerts", []):
+            sev = str(al.get("severity", "")).upper()
+            assert sev in ("LOW", "NORMAL"), \
+                f"capped 인데 alert severity={sev}: {al}"
+            if sev == "LOW":
+                assert al.get("network_only_capped") is True, \
+                    f"클램프된 alert 에 capped 마킹 누락: {al}"
 
 
 # ── Positive scenarios — should escalate ───────────────────────────────

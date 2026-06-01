@@ -209,37 +209,11 @@ def analyze(metrics: MetricsRequest):
             "error": str(_cat_e),
         }
 
-    # FP-fix #1 (pilot 2026-05): network-only 약신호 cap.
-    # 네트워크 신호만 활성이고 자원/시스템 시그니처·강한 프로세스 근거가 없으면
-    # verdict 를 최대 OBSERVE 로 cap. PID 귀속 없는 EXFIL/DOS 류 FP 차단.
-    # 면제(cap 안 함): known_miner/mining_pool fast-path, Phase2 PID 귀속
-    # (external_conn_suspicious_owner), single_core_full/process_recreation,
-    # 채굴 자원 패턴(gpu_flat/cpu_flat/stealth mismatch).
+    # FP-fix #1 (pilot 2026-05): network-only 약신호 cap. 상세/면제 규칙은
+    # scorer/network_only_cap.py 참조. cap 시 verdict→OBSERVE + alert 정합화.
     try:
-        _sig = pattern_result.get("signals", {}) or {}
-        _NET = ("net_external_high", "persistent_ext", "outbound_spike",
-                "net_out_sustained", "spike_count_1m", "new_remote_ip_burst",
-                "dos_spike")
-        _RES_SYS = ("gpu_high", "gpu_flat", "cpu_high", "cpu_flat", "vram_low",
-                    "sm_high", "power_stable", "mem_high", "mem_critical",
-                    "stealth_mismatch_power", "stealth_mismatch_vram")
-        _net_active = any(_sig.get(k) for k in _NET)
-        _res_sys_active = any(_sig.get(k) for k in _RES_SYS)
-        _fast_path = bool(_sig.get("known_miner") or _sig.get("mining_pool_ip"))
-        _strong = bool(
-            _sig.get("external_conn_suspicious_owner")
-            or _sig.get("single_core_full") or _sig.get("process_recreation")
-        )
-        _network_only = _net_active and not _res_sys_active
-        _cur_v = pattern_result.get("verdict", "NORMAL")
-        if (_network_only and not _fast_path and not _strong
-                and verdict_rank.get(_cur_v, 0) > verdict_rank["OBSERVE"]):
-            pattern_result["verdict"] = "OBSERVE"
-            pattern_result["overall_severity"] = "LOW"
-            em = pattern_result.get("evidence_meta") or {}
-            em["network_only_capped"] = True
-            em["network_only_capped_from"] = _cur_v
-            pattern_result["evidence_meta"] = em
+        from ..scorer.network_only_cap import apply_network_only_cap
+        apply_network_only_cap(pattern_result)
     except Exception:
         pass  # cap 실패는 기존 verdict 유지 (fail-open)
 

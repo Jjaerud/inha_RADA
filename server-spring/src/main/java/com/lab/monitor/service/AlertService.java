@@ -111,7 +111,9 @@ public class AlertService {
                         resp.getSignalsMissing(),
                         resp.getCategorySignals(),
                         resp.getEvidenceMeta(),
-                        resp.getLocalEvidence()))
+                        resp.getLocalEvidence(),
+                        resp.getSignalQuality(),
+                        resp.getExplanationConfidence()))
                 .alerts(resp.getAlerts())
                 .build();
         AnomalyHistory saved = alertRepository.save(anomaly);
@@ -253,6 +255,42 @@ public class AlertService {
         }
         if (hasLocal) {
             merged.put("local_evidence", localEvidence);
+        }
+        return merged;
+    }
+
+    /**
+     * #5 / #8 overload — also merges {@code signal_quality} and
+     * {@code explanation_confidence} (top-level ML audit fields) into the
+     * scores JSONB. Same semantics: the original {@code scores} reference is
+     * returned only when ALL extras are null/empty, otherwise a mutable copy.
+     */
+    static Map<String, Object> mergeAuditExtras(Map<String, Object> scores,
+                                                Map<String, Object> retrievalEvidence,
+                                                List<String> signalsMissing,
+                                                Map<String, Object> categorySignals,
+                                                Map<String, Object> evidenceMeta,
+                                                List<Map<String, Object>> localEvidence,
+                                                Map<String, Object> signalQuality,
+                                                Map<String, Object> explanationConfidence) {
+        Map<String, Object> base = mergeAuditExtras(scores, retrievalEvidence,
+                signalsMissing, categorySignals, evidenceMeta, localEvidence);
+        boolean hasQuality = signalQuality != null && !signalQuality.isEmpty();
+        boolean hasConfidence = explanationConfidence != null && !explanationConfidence.isEmpty();
+        if (!hasQuality && !hasConfidence) {
+            return base;
+        }
+        // `base` may be the original `scores` reference (when the earlier
+        // overload found no extras). Copy before mutating so we never write
+        // back into the caller's map.
+        Map<String, Object> merged = (base == scores)
+                ? new LinkedHashMap<>(base == null ? Map.of() : base)
+                : base;
+        if (hasQuality) {
+            merged.put("signal_quality", signalQuality);
+        }
+        if (hasConfidence) {
+            merged.put("explanation_confidence", explanationConfidence);
         }
         return merged;
     }

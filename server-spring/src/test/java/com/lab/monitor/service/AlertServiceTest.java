@@ -741,6 +741,65 @@ class AlertServiceTest {
     }
 
     // ──────────────────────────────────────────
+    // #5 / #8 — signal_quality + explanation_confidence audit merge
+    // ──────────────────────────────────────────
+
+    /**
+     * #5/#8: top-level ML audit fields signal_quality + explanation_confidence
+     * are merged verbatim into scores JSONB (not dropped by ignoreUnknown).
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void signal_quality_and_explanation_confidence_merged_into_scores_jsonb() {
+        Map<String, Object> scores = new java.util.LinkedHashMap<>();
+        scores.put("final", 9.0);
+        Map<String, Object> sq = Map.of(
+                "overall", "PARTIAL", "degraded_sources", List.of("gpu"));
+        Map<String, Object> ec = Map.of(
+                "level", "MEDIUM", "score", 3);
+        MlResponse resp = MlResponse.builder()
+                .overallSeverity("HIGH")
+                .verdict("DANGEROUS")
+                .scores(scores)
+                .signalQuality(sq)
+                .explanationConfidence(ec)
+                .build();
+        when(alertRepository.save(any(AnomalyHistory.class)))
+                .thenAnswer(inv -> { AnomalyHistory ah = inv.getArgument(0); ah.setId(801L); return ah; });
+
+        service.handle(resp, "pc-sq");
+
+        ArgumentCaptor<AnomalyHistory> a = ArgumentCaptor.forClass(AnomalyHistory.class);
+        verify(alertRepository).save(a.capture());
+        Map<String, Object> saved = a.getValue().getScores();
+        assertThat(saved).containsEntry("final", 9.0);
+        Map<String, Object> savedSq = (Map<String, Object>) saved.get("signal_quality");
+        assertThat(savedSq).containsEntry("overall", "PARTIAL");
+        Map<String, Object> savedEc = (Map<String, Object>) saved.get("explanation_confidence");
+        assertThat(savedEc).containsEntry("level", "MEDIUM");
+    }
+
+    @Test
+    void signal_quality_absent_leaves_scores_untouched() {
+        Map<String, Object> scores = Map.of("final", 9.0);
+        MlResponse resp = MlResponse.builder()
+                .overallSeverity("HIGH")
+                .verdict("DANGEROUS")
+                .scores(scores)
+                .build();
+        when(alertRepository.save(any(AnomalyHistory.class)))
+                .thenAnswer(inv -> { AnomalyHistory ah = inv.getArgument(0); ah.setId(802L); return ah; });
+
+        service.handle(resp, "pc-sq-none");
+
+        ArgumentCaptor<AnomalyHistory> a = ArgumentCaptor.forClass(AnomalyHistory.class);
+        verify(alertRepository).save(a.capture());
+        Map<String, Object> saved = a.getValue().getScores();
+        assertThat(saved).doesNotContainKey("signal_quality");
+        assertThat(saved).doesNotContainKey("explanation_confidence");
+    }
+
+    // ──────────────────────────────────────────
     // P1-3 alert cooldown (docs/fp_field_analysis_v0.6.md §7-P1-3)
     // ──────────────────────────────────────────
 

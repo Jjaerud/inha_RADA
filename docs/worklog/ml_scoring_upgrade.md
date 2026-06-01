@@ -292,3 +292,41 @@ mining SUSPICIOUS+)를 깨지 않음을 sustained 시나리오로 확인.
   강화 필요(현재는 #1 cap 으로 verdict 억제).
 - exfil 강도를 PID 귀속(신규 v9.1.1 클라) 유무로 graded — 귀속 有면 상향 재허용.
 - 운영 통계에서 테스트 pc_id(pc-smoke/pc-stealth) 분리 집계.
+
+---
+
+## 외부 리뷰 대응 (2026-05-29) — 정합성/감사 3건
+
+리뷰에서 지적된 3건을 코드로 검증(전부 사실) 후 수정. 전체 **478 passed** +
+Spring AlertServiceTest 통과.
+
+### ① network-only cap 의 alert 정합화 (실제 동작 버그)
+- 문제: `#1 cap` 이 verdict/overall_severity 만 OBSERVE/LOW 로 낮추고 `alerts[]`
+  는 그대로 둬, cap 직후 응답에 verdict=OBSERVE 인데 alert type=SUSPICIOUS_EXFIL
+  이 잔존. 실시간 API/Grafana 가 alerts 를 직접 보면 혼선.
+- DB 경로 영향: **없음** — cap→OBSERVE/LOW→AlertService P0-1 skip 으로
+  anomaly_history 에 미저장 → Grafana 의 `anomaly_type/alerts::text ILIKE` 집계에
+  애초에 안 잡힘. 사용자 우려(`LIKE 'SUSPICIOUS%'` 오집계)는 DB 경로에선 실재 안 함.
+- 수정: cap 로직을 `scorer/network_only_cap.py:apply_network_only_cap()` 순수
+  함수로 추출(인라인 거대 블록 정리 + 단위 테스트 가능). cap 시 alert severity 를
+  LOW 로 클램프 + `network_only_capped: true` 마킹 + detail 에 "(network-only
+  capped)" 표기. **type/detail 은 식별자/evidence 라 보존**(미래에 LOW 저장 경로가
+  생겨도 capped 플래그로 필터 가능).
+- 테스트: `tests/unit/test_network_only_cap.py` 8건(발동/면제/클램프/멱등).
+
+### ② signal_quality · explanation_confidence DB 저장 (감사 보존)
+- 문제: 두 값은 ML 응답 top-level 인데 `MlResponse` DTO 에 없어
+  `@JsonIgnoreProperties(ignoreUnknown=true)` 로 Spring 저장경로에서 버려짐.
+  (risk_vector 는 scores 안이라 JSONB 보존됨.)
+- 수정(컬럼 추가 X, scores JSONB merge): `MlResponse` 에 `signalQuality`,
+  `explanationConfidence` 필드 추가 + `AlertService.mergeAuditExtras` 8-arg
+  오버로드로 `scores.signal_quality / scores.explanation_confidence` 병합.
+  기존 retrieval_evidence/evidence_meta/... 와 동일 패턴.
+- 테스트: `AlertServiceTest` 에 merge/absent 2건 추가.
+
+### ③ scoring_policy.yaml stub 에 implemented:false 명시 (문서 정합)
+- 문제: 보류 패턴(R6/R9/N1/N6/S2/S5)에 `enabled: false` 만 있어, 정책 파일만
+  보는 사람은 "끈 것(켜면 됨)" 으로 오해. 실제론 평가 로직 미구현(silent no-op).
+- 수정: 6개 stub 에 `implemented: false` + 주석. 헤더에 enabled vs implemented
+  구분 + SSOT(`pattern_categories._STUB_PATTERNS`) 명시. 코드 동작 무변(런타임
+  응답 `category_signals.enabled_but_unimplemented` 로도 이미 노출 중).

@@ -82,4 +82,24 @@ public class MlResponse {
      * May be null on older ML deployments (pre v0.8.0).
      */
     private List<Map<String, Object>> localEvidence;
+    /**
+     * #5 — signal quality grading (snake: {@code signal_quality}). Top-level ML
+     * field. Per-source collection grade (FULL/PARTIAL/MISSING) + overall +
+     * degraded_sources + reasons. Audit-only (does not affect verdict/final):
+     * lets us tell "truly NORMAL (quiet)" from "MISSING (collection failed)",
+     * which matters for FN explanation as much as FP. Persisted into
+     * {@code anomaly_history.scores->'signal_quality'} via mergeAuditExtras.
+     * May be null on older ML deployments.
+     */
+    private Map<String, Object> signalQuality;
+    /**
+     * #8 — explanation confidence (snake: {@code explanation_confidence}).
+     * Top-level ML field. Combines signal_quality (#5) + retrieval evidence
+     * into {level: HIGH/MEDIUM/LOW, score, reasons, inputs}. Separates "the
+     * verdict" from "how confidently we can explain it" — since retrieval was
+     * removed from final score, this records where retrieval evidence was used.
+     * Persisted into {@code anomaly_history.scores->'explanation_confidence'}
+     * via mergeAuditExtras. May be null on older ML deployments.
+     */
+    private Map<String, Object> explanationConfidence;
 }
