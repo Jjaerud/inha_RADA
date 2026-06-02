@@ -234,6 +234,18 @@ retrieval segment 는 80차원 통계 임베딩 = **ML 내부 파생 상태**(Sp
    - 부트스트랩 스크립트(`infra/ncp/scripts/`)에 `rada_ml` role 생성 + ml-server
      DSN 발급 단계 추가 필요(grafana_reader 패턴과 동일 구조).
 
+### Phase B-4 — 동시성 확인 ✅ 완료
+
+ml-server 는 `def analyze`(sync) + uvicorn `--workers 1` → FastAPI **스레드풀**
+(기본 ~40 스레드)에서 동시 처리. PoC store 는 모듈 전역 단일 커넥션 공유라
+초기엔 thread-unsafe 를 우려했으나, **40 스레드 × 2000 ops 부하에서 에러 0건**.
+- psycopg2 `threadsafety=2` — 공유 커넥션 접근을 **내부 락으로 직렬화** → 충돌·
+  손상 없음(정확성 OK).
+- 함의는 정확성이 아니라 **처리량**: 모든 DB 작업이 한 커넥션에 직렬화됨.
+  RADA 실부하(40대 × 30~60초 주기 = 1 req/s 미만)에선 무시 가능.
+- Phase C 에서 동시성 상향이 필요하면 `ThreadedConnectionPool`(작은 풀) 고려 —
+  현 규모엔 **선택사항**.
+
 ### Phase C — 정식 도입 (결정 시, 미착수)
 - `RETRIEVAL_BACKEND` 기본값 전략(memory 유지 후 단계적 전환 / 즉시 pgvector).
 - ml-server 런타임 `_DDL` 제거(Flyway 가 DDL 소유). DSN env 주입.
