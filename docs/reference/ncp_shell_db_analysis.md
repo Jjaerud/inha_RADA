@@ -237,20 +237,27 @@ set -a && source .env && set +a
 alias radadb='PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME"'
 ```
 
-### 7-1. 설치 가능 여부 (비파괴 — 읽기만)
+> **현재 상태(2026-06 확인): ✅ 설치 완료** — `vector 0.8.0`, schema=`cdb_admin`.
+> 따라서 7-1/7-2 의 *설치* 단계는 끝났고, 확인은 아래 **현재 설치 확인** 쿼리면 된다.
+> 핵심 주의(7-5): extension 이 `cdb_admin` 스키마에 있어 **search_path 조정 필요**.
+
+```bash
+# 현재 설치 확인 (이미 설치됨 — schema 까지 확인)
+radadb -c "SELECT extname, extversion FROM pg_extension WHERE extname='vector';"
+radadb -c "\dx vector"   # Schema 컬럼이 cdb_admin 인지 확인
+```
+
+### 7-1. (참고) 설치 가능 여부 — 미설치 환경에서만
 ```bash
 # vector 가 목록에 나오면 '설치 가능'. 행이 없으면 managed 가 미지원.
 radadb -c "SELECT name, default_version, installed_version
            FROM pg_available_extensions WHERE name='vector';"
 ```
-- **행이 나옴** → 설치 가능. 7-2 로.
-- **행이 없음** → managed 가 vector 를 제공하지 않음 → 7-3(대안)으로.
 
-### 7-2. 실제 설치 권한 확인 (도입 결정 후에만)
+### 7-2. (참고) 설치 — 미설치 시에만 (이미 설치됐으면 건너뜀)
 ```bash
-# CREATE EXTENSION 은 보통 상위 권한 필요. 앱 User 로 막히면 콘솔/마스터 계정 필요.
+# 콘솔로 설치했으면 불필요. 자체설치 PG 면 상위권한으로 1회.
 radadb -c "CREATE EXTENSION IF NOT EXISTS vector;"
-radadb -c "SELECT extversion FROM pg_extension WHERE extname='vector';"
 ```
 - 권한 오류(`permission denied to create extension`) 시:
   **NCP 콘솔 → Cloud DB for PostgreSQL → DB Manager / 파라미터·extension 설정**
@@ -264,16 +271,29 @@ radadb -c "SELECT extversion FROM pg_extension WHERE extname='vector';"
 | (ii) 자체 PostgreSQL | NCP 가 managed 가 아닌 VM 직접 운영 PG 면 `pgvector/pgvector` 설치 가능 |
 | (iii) in-memory 유지 | 도입 보류. 현행 휘발성 retrieval 유지(소규모면 충분) |
 
-### 7-4. 지원 확인됐다면 — 도입 시 운영자 작업(요약)
-1. (위 7-2) 운영자/마스터 계정으로 `CREATE EXTENSION vector` 1회.
+### 7-4. 도입 시 운영자 작업(요약)
+1. ~~CREATE EXTENSION~~ — **이미 완료**(콘솔 설치, cdb_admin 스키마).
 2. 전용 최소권한 role 생성(부트스트랩 스크립트):
    ```sql
    CREATE ROLE rada_ml LOGIN PASSWORD '<강한 비밀번호>';
-   -- 테이블/GRANT 은 Flyway V9 가 처리(rada_ml 존재 시 자동 GRANT).
+   -- cdb_admin 스키마 USAGE 가 없으면 vector 타입을 못 쓴다(7-5):
+   GRANT USAGE ON SCHEMA cdb_admin TO rada_ml;   -- 미부여 시에만
+   -- 테이블/GRANT/search_path 는 Flyway V9 가 처리(rada_ml 존재 시 자동).
    ```
 3. ml-server 에 `RETRIEVAL_BACKEND=pgvector` + `RETRIEVAL_PG_DSN`(rada_ml 계정)
    env 주입 후 `up -d --force-recreate ml-server`.
-4. Flyway V9 가 테이블·HNSW 인덱스·GRANT 적용(앱 배포 시 자동).
+4. Flyway V9 가 테이블·HNSW 인덱스·GRANT·search_path 적용(앱 배포 시 자동).
+
+### 7-5. ⚠️ cdb_admin 스키마 주의 (NCP 고유)
+NCP 는 `vector` 를 **`cdb_admin` 스키마**에 설치한다(로컬/일반 PG 는 `public`).
+`vector` 타입·`vector_cosine_ops` opclass·`<=>` 연산자가 전부 cdb_admin 소속이라,
+이를 쓰는 **모든 role 의 search_path 에 cdb_admin 을 포함**해야 한다.
+```sql
+-- Flyway V9 가 자동 적용하지만, 수동 확인/설정 시:
+ALTER ROLE rada_ml SET search_path TO pc_monitor, cdb_admin, public;
+-- 누락 시 증상: ERROR: type "vector" does not exist
+```
+- 확인: `radadb -c "SHOW search_path;"` 후 cdb_admin 포함 여부 점검.
 
 ---
 
@@ -288,3 +308,4 @@ radadb -c "SELECT extversion FROM pg_extension WHERE extname='vector';"
 | 한글 깨짐 | 터미널 UTF-8 설정 (`export LANG=ko_KR.UTF-8` 또는 PuTTY 인코딩) |
 | `vector` 미지원 | 7-1 결과 무행 → managed 미제공. 7-3 대안(콘솔 활성화/자체 PG/보류) |
 | `permission denied to create extension` | 앱 User DDL 권한 없음 — 콘솔 또는 마스터 계정으로 1회 설치(7-2) |
+| `type "vector" does not exist` | search_path 에 `cdb_admin` 누락 — `ALTER ROLE ... SET search_path TO pc_monitor, cdb_admin, public`(7-5) |

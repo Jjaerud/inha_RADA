@@ -3,7 +3,8 @@
 > 상태: **PoC 완료 (로컬 실증, 미커밋)** · 작성일 2026-06-02
 > 결론: **도입 타당성 입증** — 영속성·확장성(194×) 이점 확인, 판단 결과 동치
 > (verdict 분포 50k 에서도 100% 보존). recall 47% 는 tie-break 착시로 규명됨.
-> 다음: 아키텍처 결정(ml-server↔DB) → NCP pgvector 지원·Flyway → 정식 도입 여부.
+> NCP 지원: ✅ 확인됨(vector 0.8.0, cdb_admin 스키마 — search_path 조정 필요).
+> 다음: 정식 도입 여부 결정(Phase C — Flyway V9·백엔드 전환·_DDL 제거).
 
 ---
 
@@ -184,28 +185,34 @@ retrieval segment 는 80차원 통계 임베딩 = **ML 내부 파생 상태**(Sp
 3. **재생성 가능 캐시로 취급** — 백업·마이그레이션 부담 없음. 손상 시 TRUNCATE
    후 재누적. 업무 데이터 정합성 책임 없음.
 
-### Phase B-3 — NCP pgvector 지원 확인 + Flyway 설계 (정식 도입 전 필수)
+### Phase B-3 — NCP pgvector 지원 확인 + Flyway 설계 ✅ 확인 완료
 
-1. **NCP Cloud DB(managed PostgreSQL) `vector` extension 지원 확인** ⚠️ 미확정.
-   - managed 환경은 extension allow-list 가 제한적. `SELECT * FROM
-     pg_available_extensions WHERE name='vector';` 로 설치 가능 여부 확인 필요.
-   - 미지원 시 대안: (i) NCP 콘솔/지원으로 vector 활성화 요청, (ii) 자체 설치
-     PostgreSQL(현 NCP 구성이 systemd 직접 운영이면 가능), (iii) in-memory 유지.
-   - **이 확인이 도입의 전제조건** — 미지원이면 Phase C 보류.
+1. **NCP Cloud DB(managed PostgreSQL) `vector` extension 지원** ✅ **확인됨**.
+   - 운영 DB 조회 결과: `vector 0.8.0`, **schema=`cdb_admin`**, hnsw 접근메서드 포함.
+     (NCP 콘솔에서 설치 완료 상태 — `CREATE EXTENSION` 재실행 불필요.)
+   - 로컬 PoC(0.8.2)와 미세 버전차지만 HNSW·`vector_cosine_ops`·`<=>` 모두 동일
+     지원 → 기능 영향 없음. **도입 전제조건 충족**.
+   - ⚠️ **핵심 차이 — extension 이 `cdb_admin` 스키마에 설치됨**(로컬 PoC 는
+     `public`). `vector` 타입·`vector_cosine_ops` opclass·`<=>` 연산자가 모두
+     `cdb_admin` 소속이라, 이를 쓰는 **모든 role 의 search_path 에 `cdb_admin` 을
+     포함**해야 한다. 누락 시 `type "vector" does not exist` 발생.
 2. **Flyway `V9__retrieval_segments.sql` 초안** (현 V1~V8 패턴 정합:
-   `${db_schema}`/`${db_user}` placeholder, grafana_reader 불필요=쓰기 전용):
+   `${db_schema}`/`${db_user}` placeholder, NCP `cdb_admin` 스키마 반영):
 
    ```sql
    -- V9: pgvector retrieval segments (ML-internal cache, regenerable).
-   -- CREATE EXTENSION requires elevated privilege; operator/Flyway runs once.
-   CREATE EXTENSION IF NOT EXISTS vector;
+   -- NCP: extension 은 콘솔에서 cdb_admin 스키마에 이미 설치됨(CREATE 불필요).
+   --      vector 타입/opclass 해석을 위해 이 마이그레이션 세션 search_path 에
+   --      cdb_admin 을 포함한다. (자체 PG 라면 public 으로 바꾸고 CREATE EXTENSION)
+   SET search_path TO ${db_schema}, cdb_admin, public;
+   -- CREATE EXTENSION IF NOT EXISTS vector;  -- 자체설치 PG 일 때만(상위권한). NCP 는 생략.
 
    CREATE TABLE IF NOT EXISTS ${db_schema}.retrieval_segments (
        id          BIGSERIAL PRIMARY KEY,
        segment_id  TEXT,
        pc_id       TEXT,
        slot        TEXT,
-       embedding   vector(80),
+       embedding   vector(80),       -- cdb_admin.vector (search_path 로 해석)
        verdict     TEXT,
        score       REAL,
        start_ts    TEXT,   -- ISO 문자열 (PoC 에서 검증: double 아님)
@@ -218,6 +225,7 @@ retrieval segment 는 80차원 통계 임베딩 = **ML 내부 파생 상태**(Sp
        USING hnsw (embedding vector_cosine_ops);
 
    -- 전용 ML role 최소권한(role 자체는 운영자 부트스트랩 스크립트가 생성).
+   -- search_path 에 cdb_admin 필수 — 런타임 쿼리의 vector 타입/<=> 연산자 해석.
    DO $$
    BEGIN
        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rada_ml') THEN
@@ -227,12 +235,15 @@ retrieval segment 는 80차원 통계 임베딩 = **ML 내부 파생 상태**(Sp
            EXECUTE format(
                'GRANT USAGE, SELECT ON SEQUENCE %I.retrieval_segments_id_seq TO rada_ml',
                '${db_schema}');
-           EXECUTE 'ALTER ROLE rada_ml SET search_path TO ${db_schema}, public';
+           EXECUTE 'ALTER ROLE rada_ml SET search_path TO ${db_schema}, cdb_admin, public';
        END IF;
    END $$;
    ```
    - 부트스트랩 스크립트(`infra/ncp/scripts/`)에 `rada_ml` role 생성 + ml-server
      DSN 발급 단계 추가 필요(grafana_reader 패턴과 동일 구조).
+   - ⚠️ `rada_ml` 이 `cdb_admin` 스키마에 **USAGE** 권한이 있어야 vector 타입을
+     쓸 수 있다(NCP 가 app role 에 기본 부여하는지 Phase C 에서 확인). 미부여 시
+     운영자/콘솔로 `GRANT USAGE ON SCHEMA cdb_admin TO rada_ml`.
 
 ### Phase B-4 — 동시성 확인 ✅ 완료
 
