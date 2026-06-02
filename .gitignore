@@ -48,3 +48,9 @@ tools/_*.csv
 tools/provisioned_keys*.csv
 tools/*.key
 provisioned_keys*.csv
+
+# pgvector 로컬 전용 (커밋 안 함)
+# - override.yml: 개인용 auto-load pgvector overlay (공용은 docker-compose.pgvector.yml)
+# - .poc/: PoC/벤치 검증 스크립트(throwaway)
+docker-compose.override.yml
+.poc/

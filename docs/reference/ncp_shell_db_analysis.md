@@ -271,18 +271,31 @@ radadb -c "CREATE EXTENSION IF NOT EXISTS vector;"
 | (ii) 자체 PostgreSQL | NCP 가 managed 가 아닌 VM 직접 운영 PG 면 `pgvector/pgvector` 설치 가능 |
 | (iii) in-memory 유지 | 도입 보류. 현행 휘발성 retrieval 유지(소규모면 충분) |
 
-### 7-4. 도입 시 운영자 작업(요약)
+### 7-4. 활성화 시 운영자 작업(요약)
+> 스키마/테이블 DDL 은 **ml-server store 가 자체 멱등 생성**한다(Flyway 아님 —
+> Flyway 는 pgvector 없는 환경서도 실행돼 위험). 운영자는 **env 주입만** 하면 된다.
+
 1. ~~CREATE EXTENSION~~ — **이미 완료**(콘솔 설치, cdb_admin 스키마).
-2. 전용 최소권한 role 생성(부트스트랩 스크립트):
-   ```sql
-   CREATE ROLE rada_ml LOGIN PASSWORD '<강한 비밀번호>';
-   -- cdb_admin 스키마 USAGE 가 없으면 vector 타입을 못 쓴다(7-5):
-   GRANT USAGE ON SCHEMA cdb_admin TO rada_ml;   -- 미부여 시에만
-   -- 테이블/GRANT/search_path 는 Flyway V9 가 처리(rada_ml 존재 시 자동).
+2. retrieval 용 DB 계정 — 둘 중 하나:
+   - **(간단)** 기존 app DB user(`$DB_USER`, pc_monitor 에 DDL 권한) 재사용.
+     store 가 첫 연결 시 테이블·HNSW 인덱스를 만든다. 가장 빠름.
+   - **(하드닝)** 전용 `rada_ml` role:
+     ```sql
+     CREATE ROLE rada_ml LOGIN PASSWORD '<강한 비밀번호>';
+     GRANT USAGE, CREATE ON SCHEMA pc_monitor TO rada_ml;  -- 테이블 생성용
+     GRANT USAGE ON SCHEMA cdb_admin TO rada_ml;            -- vector 타입 접근(7-5)
+     ```
+3. `.env` 에 추가 후 ml-server 만 재기동:
+   ```bash
+   # RETRIEVAL_BACKEND=pgvector
+   # RETRIEVAL_PG_DSN=postgresql://<user>:<pw>@<DB_HOST>:5432/pc_monitor
+   docker compose -f docker-compose.ncp.yml up -d --force-recreate ml-server
    ```
-3. ml-server 에 `RETRIEVAL_BACKEND=pgvector` + `RETRIEVAL_PG_DSN`(rada_ml 계정)
-   env 주입 후 `up -d --force-recreate ml-server`.
-4. Flyway V9 가 테이블·HNSW 인덱스·GRANT·search_path 적용(앱 배포 시 자동).
+4. 확인: `docker exec rada-ml python -c "from ml_server.retrieval import add_segment;
+   print(add_segment.__module__)"` → `...retrieval_store_pgvector` 면 활성.
+   `radadb -c "SELECT count(*) FROM pc_monitor.retrieval_segments;"` 로 적재 관찰.
+5. **24h 관찰** 후 정상이면 유지. 끄려면 .env 의 두 줄 제거 후 재기동 →
+   즉시 in-memory 복귀(롤백 간단, 데이터는 재생성 캐시라 버려도 무방).
 
 ### 7-5. ⚠️ cdb_admin 스키마 주의 (NCP 고유)
 NCP 는 `vector` 를 **`cdb_admin` 스키마**에 설치한다(로컬/일반 PG 는 `public`).

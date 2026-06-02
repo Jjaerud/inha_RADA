@@ -1,10 +1,10 @@
 # 벡터DB(pgvector) 도입 검토 및 PoC 결과
 
-> 상태: **PoC 완료 (로컬 실증, 미커밋)** · 작성일 2026-06-02
+> 상태: **Phase C 완료 — opt-in 백엔드 main 커밋(기본 memory)** · 작성일 2026-06-02
 > 결론: **도입 타당성 입증** — 영속성·확장성(194×) 이점 확인, 판단 결과 동치
 > (verdict 분포 50k 에서도 100% 보존). recall 47% 는 tie-break 착시로 규명됨.
-> NCP 지원: ✅ 확인됨(vector 0.8.0, cdb_admin 스키마 — search_path 조정 필요).
-> 다음: 정식 도입 여부 결정(Phase C — Flyway V9·백엔드 전환·_DDL 제거).
+> NCP 지원: ✅ 확인됨(vector 0.8.0, cdb_admin 스키마 — store 가 search_path 처리).
+> 남은 것: **NCP 운영 활성화**(운영자 .env 플래그 + 24h 관찰) — 코드 변경과 분리.
 
 ---
 
@@ -177,13 +177,23 @@ retrieval segment 는 80차원 통계 임베딩 = **ML 내부 파생 상태**(Sp
 게 아니다. 영속 retrieval 은 오히려 ML 을 재시작에 견고하게 만든다(cold start 제거).
 
 **가드레일(원칙 보존)**:
-1. **DDL 은 Flyway 소유** — 스키마 단일 진실원 유지. ml-server 런타임의
-   `CREATE EXTENSION/TABLE`(현 PoC `_DDL`)은 **운영 전 제거**, 부팅 시 DDL 금지.
-2. **전용 최소권한 role** — `rada_ml`(가칭): `retrieval_segments` 에 대해
-   INSERT/SELECT/DELETE/TRUNCATE 만. Spring app role 도 superuser 도 아님.
-   `CREATE EXTENSION vector` 는 운영자/Flyway 가 1회 수행(상위 권한 필요).
+1. **DDL 은 store 가 멱등 소유**(Flyway 아님 — 아래 ★). pgvector 백엔드가
+   활성일 때만 `CREATE TABLE/INDEX IF NOT EXISTS` 를 수행. `CREATE EXTENSION`
+   은 *없을 때만* 조건부 시도(NCP 는 콘솔 설치 완료라 skip).
+2. **opt-in 기본값** — `RETRIEVAL_BACKEND` 미설정 = in-memory(기존 경로). pgvector
+   는 env 명시 시에만 활성 → main/NCP 는 플래그 전까지 **무영향**(additive).
 3. **재생성 가능 캐시로 취급** — 백업·마이그레이션 부담 없음. 손상 시 TRUNCATE
    후 재누적. 업무 데이터 정합성 책임 없음.
+
+> ★ **왜 Flyway V9 가 아니라 store-owned DDL 인가** (초안에서 변경):
+> Flyway 는 pgvector 가 **없는 환경에서도 실행**된다 — CI 의 compose config 검증,
+> base 로컬 스택(`postgres:16-alpine`, vector 미설치). 거기에 `CREATE EXTENSION
+> vector` 를 넣으면 `vector.control` 부재로 **Spring 기동 자체가 깨진다**. 반면
+> store 는 pgvector 백엔드가 켜졌을 때만 로드되므로 안전하게 DDL 을 책임진다.
+> 테이블이 ML 내부 재생성 캐시라 "단일 진실원" 부담도 없다. → 더 안전·additive.
+> (least-privilege `rada_ml` role 은 store 가 CREATE TABLE 을 하려면 schema CREATE
+> 권한이 필요해 trade-off. 운영 활성화 시 app role 사용 또는 rada_ml+CREATE 부여 —
+> 하드닝 항목으로 NCP 활성화 가이드에 정리.)
 
 ### Phase B-3 — NCP pgvector 지원 확인 + Flyway 설계 ✅ 확인 완료
 
@@ -196,54 +206,22 @@ retrieval segment 는 80차원 통계 임베딩 = **ML 내부 파생 상태**(Sp
      `public`). `vector` 타입·`vector_cosine_ops` opclass·`<=>` 연산자가 모두
      `cdb_admin` 소속이라, 이를 쓰는 **모든 role 의 search_path 에 `cdb_admin` 을
      포함**해야 한다. 누락 시 `type "vector" does not exist` 발생.
-2. **Flyway `V9__retrieval_segments.sql` 초안** (현 V1~V8 패턴 정합:
-   `${db_schema}`/`${db_user}` placeholder, NCP `cdb_admin` 스키마 반영):
-
-   ```sql
-   -- V9: pgvector retrieval segments (ML-internal cache, regenerable).
-   -- NCP: extension 은 콘솔에서 cdb_admin 스키마에 이미 설치됨(CREATE 불필요).
-   --      vector 타입/opclass 해석을 위해 이 마이그레이션 세션 search_path 에
-   --      cdb_admin 을 포함한다. (자체 PG 라면 public 으로 바꾸고 CREATE EXTENSION)
-   SET search_path TO ${db_schema}, cdb_admin, public;
-   -- CREATE EXTENSION IF NOT EXISTS vector;  -- 자체설치 PG 일 때만(상위권한). NCP 는 생략.
-
-   CREATE TABLE IF NOT EXISTS ${db_schema}.retrieval_segments (
-       id          BIGSERIAL PRIMARY KEY,
-       segment_id  TEXT,
-       pc_id       TEXT,
-       slot        TEXT,
-       embedding   vector(80),       -- cdb_admin.vector (search_path 로 해석)
-       verdict     TEXT,
-       score       REAL,
-       start_ts    TEXT,   -- ISO 문자열 (PoC 에서 검증: double 아님)
-       end_ts      TEXT
-   );
-   CREATE INDEX IF NOT EXISTS idx_retr_slot
-       ON ${db_schema}.retrieval_segments (slot);
-   CREATE INDEX IF NOT EXISTS idx_retr_emb_hnsw
-       ON ${db_schema}.retrieval_segments
-       USING hnsw (embedding vector_cosine_ops);
-
-   -- 전용 ML role 최소권한(role 자체는 운영자 부트스트랩 스크립트가 생성).
-   -- search_path 에 cdb_admin 필수 — 런타임 쿼리의 vector 타입/<=> 연산자 해석.
-   DO $$
-   BEGIN
-       IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rada_ml') THEN
-           EXECUTE format(
-               'GRANT INSERT, SELECT, DELETE, TRUNCATE ON %I.retrieval_segments TO rada_ml',
-               '${db_schema}');
-           EXECUTE format(
-               'GRANT USAGE, SELECT ON SEQUENCE %I.retrieval_segments_id_seq TO rada_ml',
-               '${db_schema}');
-           EXECUTE 'ALTER ROLE rada_ml SET search_path TO ${db_schema}, cdb_admin, public';
-       END IF;
-   END $$;
-   ```
-   - 부트스트랩 스크립트(`infra/ncp/scripts/`)에 `rada_ml` role 생성 + ml-server
-     DSN 발급 단계 추가 필요(grafana_reader 패턴과 동일 구조).
-   - ⚠️ `rada_ml` 이 `cdb_admin` 스키마에 **USAGE** 권한이 있어야 vector 타입을
-     쓸 수 있다(NCP 가 app role 에 기본 부여하는지 Phase C 에서 확인). 미부여 시
-     운영자/콘솔로 `GRANT USAGE ON SCHEMA cdb_admin TO rada_ml`.
+2. **스키마 DDL — Flyway V9 폐기, store-owned 으로 전환** (B-2 ★ 참고).
+   초안의 `V9__retrieval_segments.sql` 은 **채택하지 않는다**. Flyway 가 pgvector
+   미설치 환경(CI·base 로컬)에서도 실행돼 기동을 깨기 때문. 대신 store
+   (`retrieval_store_pgvector.py`)가 연결 시 **멱등 DDL** 을 수행한다:
+   - `SET search_path TO <schema>, cdb_admin, public` — NCP cdb_admin 의 vector
+     타입/opclass/`<=>` 해석(없는 환경에선 자동 무시 → 로컬 public 으로 해석).
+   - extension: `pg_extension` 에 없을 때만 `CREATE EXTENSION` 시도(NCP 는 이미
+     설치 → skip; 권한 없어 실패해도 조용히 통과 후 CREATE TABLE 에서 검증).
+   - `CREATE TABLE/INDEX IF NOT EXISTS`(테이블·slot·HNSW). 스키마는
+     `RETRIEVAL_PG_SCHEMA`(기본 pc_monitor) env.
+3. **NCP 활성화 시 role/권한**(운영자):
+   - 간단: 기존 app DB user(Spring 과 동일, pc_monitor 에 DDL 권한 보유)를
+     retrieval DSN 으로 재사용 → store 가 CREATE TABLE 가능. 가장 빠름.
+   - 하드닝: 전용 `rada_ml` role + `CREATE ON SCHEMA pc_monitor` + `USAGE ON
+     SCHEMA cdb_admin`(vector 타입 접근). search_path 에 cdb_admin 포함.
+   - 절차는 NCP 가이드 §7-4/§7-5 참고.
 
 ### Phase B-4 — 동시성 확인 ✅ 완료
 
@@ -257,23 +235,36 @@ ml-server 는 `def analyze`(sync) + uvicorn `--workers 1` → FastAPI **스레�
 - Phase C 에서 동시성 상향이 필요하면 `ThreadedConnectionPool`(작은 풀) 고려 —
   현 규모엔 **선택사항**.
 
-### Phase C — 정식 도입 (결정 시, 미착수)
-- `RETRIEVAL_BACKEND` 기본값 전략(memory 유지 후 단계적 전환 / 즉시 pgvector).
-- ml-server 런타임 `_DDL` 제거(Flyway 가 DDL 소유). DSN env 주입.
-- corpus 마이그레이션 불필요(임베딩 재생성 가능, 누적만 다름).
-- 운영 관찰: retrieval_evidence 품질·검색 지연 모니터링.
+### Phase C — 정식 도입(opt-in 커밋) ✅ 완료
+
+pgvector 백엔드를 **opt-in 코드로 main 에 커밋**(기본값 memory 유지). 코드는
+존재하되 env 플래그 전까진 비활성 → main/NCP **무영향**(additive).
+- `retrieval_store_pgvector.py` 운영화 — cdb_admin search_path, 조건부 extension,
+  멱등 CREATE TABLE/INDEX, `RETRIEVAL_PG_SCHEMA` env.
+- `__init__.py` 백엔드 분기(`RETRIEVAL_BACKEND=pgvector` 일 때만 pgvector 로드).
+- `docker-compose.pgvector.yml` 명시적 overlay(auto-load 아님) — 로컬 활성화용.
+- 로컬 검증 ✅: overlay 로 ml-server pgvector 기동 → 적재 3건이 **ml-server
+  재시작 후에도 유지**(영속성). 백엔드 모듈 `retrieval_store_pgvector` 확인.
+
+**NCP 활성화(운영자 차례, 미실행)**: managed Cloud DB 에 vector 이미 설치됨.
+.env 에 `RETRIEVAL_BACKEND=pgvector` + `RETRIEVAL_PG_DSN`(가이드 §7-4) 추가 후
+`up -d --force-recreate ml-server`. **24h 관찰** 권장(retrieval_evidence 품질·지연).
+끄려면 env 제거 후 재기동 → 즉시 in-memory 복귀(롤백 간단).
+
+**향후(선택)**: 동시성 상향 시 `ThreadedConnectionPool`, 하드닝 `rada_ml` role.
 
 ---
 
-## 6. PoC 산출물 (현재 로컬, 미커밋)
+## 6. 산출물
 
 | 파일 | 상태 |
 |---|---|
-| `docker-compose.override.yml` | gitignore — postgres→pgvector 이미지 + ml-server 백엔드 env |
-| `ml_server/retrieval/retrieval_store_pgvector.py` | gitignore — pgvector 백엔드 모듈 |
-| `.poc/` | gitignore — 검증 스크립트 |
-| `ml_server/requirements.txt` | 작업트리 변경(psycopg2-binary) — 미커밋 |
-| `ml_server/retrieval/__init__.py` | 작업트리 변경(백엔드 분기) — 미커밋 |
+| `ml_server/retrieval/retrieval_store_pgvector.py` | ✅ 커밋(운영화) — pgvector 백엔드 |
+| `ml_server/retrieval/__init__.py` | ✅ 커밋 — 백엔드 분기(기본 memory) |
+| `ml_server/requirements.txt` | ✅ 커밋 — psycopg2-binary |
+| `docker-compose.pgvector.yml` | ✅ 커밋 — 명시적 opt-in overlay |
+| `docker-compose.override.yml` | gitignore — 개인용 auto-load overlay(로컬) |
+| `.poc/` | gitignore — 벤치/검증 스크립트(throwaway) |
 
-> 전부 로컬·미커밋이라 **main/NCP 영향 0**. 정식 도입(Phase C) 결정 시
-> gitignore 해제 + Flyway 마이그레이션과 함께 커밋한다.
+> 커밋분은 **기본 비활성(opt-in)** 이라 main/NCP 는 env 플래그 전까지 영향 0.
+> 운영 활성화는 NCP .env 변경(운영자) — 본 저장소 변경과 분리.

@@ -1,0 +1,21 @@
+# pgvector overlay — 명시적 opt-in (auto-load 아님).
+#
+# retrieval 영속 백엔드를 in-memory → pgvector 로 전환한다. base 설정은
+# 건드리지 않으므로, 이 overlay 를 -f 로 명시할 때만 활성화된다(additive):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.pgvector.yml up -d
+#
+# postgres 를 pgvector 이미지로 교체(pg16 동일 메이저라 rada_pgdata 볼륨 호환)
+# 하고, ml-server 에 RETRIEVAL_BACKEND=pgvector + DSN 을 주입한다.
+#
+# NCP(운영)는 이 파일을 쓰지 않는다 — managed Cloud DB 가 vector 를 제공하므로
+# .env 에 RETRIEVAL_BACKEND / RETRIEVAL_PG_DSN 만 추가하면 된다(가이드 7-4 참고).
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+
+  ml-server:
+    environment:
+      RETRIEVAL_BACKEND: pgvector
+      RETRIEVAL_PG_DSN: postgresql://rada:rada_dev_pw@postgres:5432/pc_monitor
+      # RETRIEVAL_PG_SCHEMA: pc_monitor   # 기본값. NCP 도 동일 스키마.
