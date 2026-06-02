@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from collections import deque
 
-import pytest
 
 from ml_server.model.requests import MetricsRequest
 from ml_server.scorer.verdict_classifier import analyze_pattern, build_local_evidence

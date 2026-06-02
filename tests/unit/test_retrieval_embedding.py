@@ -6,7 +6,6 @@
 3. distance mode env 가 정상 동작한다.
 """
 from __future__ import annotations
-import math
 import os
 import importlib
 

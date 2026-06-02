@@ -19,12 +19,11 @@ from __future__ import annotations
 import json
 import os
 import sys
-import math
 import random
 import statistics
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List
 
 # 프로젝트 루트를 sys.path 에 추가
 _ROOT = Path(__file__).resolve().parents[1]

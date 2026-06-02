@@ -4,7 +4,7 @@
 반영되지 않는다(risk_vector 전용). 여기서는 신호 발화 로직 + risk_vector
 재투영을 검증한다.
 """
-from collections import deque, defaultdict
+from collections import deque
 
 from ml_server.scorer.signal_extractor import extract_signals
 from ml_server.scorer.risk_vector import compute_risk_vector

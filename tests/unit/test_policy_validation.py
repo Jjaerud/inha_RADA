@@ -33,7 +33,6 @@ def test_thresholds_must_be_strict_ascending():
 
 
 def test_scores_reject_none_or_nan():
-    import math
     d = _ok()
     d["scores"]["bad"] = None
     with pytest.raises(PolicyValidationError):

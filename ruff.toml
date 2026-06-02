@@ -1,0 +1,21 @@
+# RADA — ruff 린트 설정
+# CI 의 ruff 는 warnings-only(continue-on-error) 이지만, annotation 노이즈를
+# 줄이기 위해 레거시/의도적 패턴을 정리한다.
+
+exclude = [
+  "ml_server.py",        # ml_server/ 패키지에 가려진 레거시 단일파일(미사용·죽은 코드)
+  "ml_server.py.legacy", # 명시적 레거시 백업
+]
+
+[lint]
+# E701: scorer 의 "조건: 점수 += N" 한 줄 정렬은 점수 계산 가독성을 위한 의도.
+# E731: 짧은 lambda 헬퍼(예: risk_vector._combo 의 g = lambda k: ...)는 의도적.
+ignore = ["E701", "E731"]
+
+[lint.per-file-ignores]
+# client_core/runtime/loop.py: subprocess CREATE_NO_WINDOW 패치(cmd 창 깜빡임
+# 방지)를 다른 import 보다 먼저 실행해야 하므로 module-level import 가 패치
+# 코드 아래에 온다 → E402 는 의도적.
+"client_core/runtime/loop.py" = ["E402"]
+# 테스트의 단문자 변수(l 등)는 가독성에 영향 적어 허용.
+"tests/**/*.py" = ["E741"]

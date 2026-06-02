@@ -2,7 +2,6 @@
 import pytest
 
 from ml_server.policy import reload_policies, get_scoring_policy
-from ml_server.policy import loader as policy_loader
 from ml_server.scorer.verdict_classifier import classify_verdict
 
 

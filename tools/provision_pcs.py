@@ -35,7 +35,6 @@ import secrets
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
 # Allow running as ``python tools/provision_pcs.py`` without packaging.
 sys.path.insert(0, str(Path(__file__).resolve().parent))

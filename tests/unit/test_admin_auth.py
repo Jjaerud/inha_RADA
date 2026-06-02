@@ -1,7 +1,6 @@
 """Admin token auth — /admin/reload-policy 와 DELETE /history/{pc_id} 검증."""
 from __future__ import annotations
 
-import os
 
 import pytest
 from fastapi.testclient import TestClient

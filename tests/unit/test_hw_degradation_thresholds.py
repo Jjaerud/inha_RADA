@@ -7,7 +7,6 @@ docs/fp_field_analysis_v0.6.md §10 LOCAL_HW_CPU_DEGRADATION 점검:
 """
 from __future__ import annotations
 
-import pytest
 
 from client_core.config import defaults
 from client_core.detector.hw_degradation import HwDegradationDetector

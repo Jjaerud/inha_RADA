@@ -12,7 +12,7 @@ R2: per-feature 정규화 추가. 큰 스케일 (vram_mb, packet_count, outbound
 from __future__ import annotations
 import math
 import os
-from typing import List, Tuple
+from typing import List
 
 FEATURES = (
     "cpu_percent",

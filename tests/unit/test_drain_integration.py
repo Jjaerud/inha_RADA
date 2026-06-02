@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from client_core.runtime.loop import ClientRuntime, RETRY_PER_CYCLE
 from client_core.sender import LocalQueue, MetricsSender

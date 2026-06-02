@@ -108,7 +108,7 @@ verdict={verdict} (NORMAL|OBSERVE|SUSPICIOUS|HIGH_RISK), 최종점수={scores.ge
 
 
 def call_claude_api(prompt: str) -> dict:
-    import requests as req, json
+    import requests as req
     from ..config import (
         get_anthropic_api_key,
         get_claude_model,

@@ -1,10 +1,6 @@
 """policy.loader — YAML 로드 + 캐시 + reload + env override."""
-import os
-from pathlib import Path
 
-import pytest
 
-from ml_server.policy import loader as policy_loader
 from ml_server.policy import (
     get_scoring_policy,
     get_allowlist,

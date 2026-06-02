@@ -92,7 +92,6 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
     vram_mb    = gpu.memory_used_mb    if gpu else 0.0
     vram_total = (gpu.memory_total_mb  if gpu else 0.0) or 8192.0
     tensor     = gpu.tensor_core_active if gpu else None
-    power      = gpu.power_draw_w      if gpu else None
     sm         = gpu.sm_utilization    if gpu else None
     vram_ratio = vram_mb / vram_total
     gpu_active = gpu_pct >= 30.0
@@ -111,21 +110,16 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
             avg_power    = statistics.mean(power_vals)
             power_stddev = statistics.stdev(power_vals)
 
-    cpu_stddev = avg_cpu = None
+    cpu_stddev = None
     if has_history:
         cpu_vals   = [h["cpu_percent"] for h in history_list]
         cpu_stddev = statistics.stdev(cpu_vals)
-        avg_cpu    = statistics.mean(cpu_vals)
 
     avg_inbound = avg_outbound = avg_ext_count = 0.0
-    outbound_stddev = None
     if has_history:
         avg_inbound  = statistics.mean([h["inbound_mb"]  for h in history_list])
         avg_outbound = statistics.mean([h["outbound_mb"] for h in history_list])
         avg_ext_count= statistics.mean([h["external_packet_count"] for h in history_list])
-        ob_vals = [h["outbound_mb"] for h in history_list]
-        if len(ob_vals) >= 2:
-            outbound_stddev = statistics.stdev(ob_vals)
 
     # 네트워크 — 규칙 기반 (ML과 분리)
     mining_pool_hit = any(

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import os
 import sys
 from pathlib import Path
 

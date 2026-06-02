@@ -1,5 +1,4 @@
 """signal_extractor 가 YAML allowlist 를 사용함을 확인."""
-import pytest
 from collections import deque
 
 from ml_server.policy import reload_policies

@@ -11,7 +11,6 @@ import os
 import sys
 import random
 import importlib
-import math
 from pathlib import Path
 from typing import List, Tuple, Dict
 
@@ -211,7 +210,7 @@ def main():
     lines.append(f"- 합성 segment: {len(SCENARIOS) * PER_SCENARIO} 개 ({PER_SCENARIO} × {', '.join(SCENARIOS)})")
     lines.append(f"- window_size: {WINDOW} snapshots/segment")
     lines.append(f"- seed: {SEED} (deterministic)")
-    lines.append(f"- 각 segment 를 쿼리로 사용하여 self-exclude self-search, top-K=5")
+    lines.append("- 각 segment 를 쿼리로 사용하여 self-exclude self-search, top-K=5")
     lines.append("")
     lines.append("## Results")
     lines.append("")

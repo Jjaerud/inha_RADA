@@ -1,5 +1,4 @@
 """is_mock 필드 — runner Claude/Mock 분기 회귀."""
-import pytest
 
 from ml_server.agent import runner
 from ml_server.model.requests import MetricsRequest

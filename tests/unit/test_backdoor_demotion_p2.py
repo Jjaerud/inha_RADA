@@ -26,7 +26,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-import pytest
 
 from ml_server.scorer.indicator_calculator import calculate_indicators
 

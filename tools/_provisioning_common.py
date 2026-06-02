@@ -13,14 +13,12 @@ stack (the scenario flagged in the brief — no psycopg in requirements).
 from __future__ import annotations
 
 import hashlib
-import json
 import os
-import shlex
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Sequence
 
 
 HASH_HEX_LENGTH = 64

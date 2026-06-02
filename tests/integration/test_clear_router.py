@@ -13,7 +13,7 @@ from ml_server.storage import (
     model_store,
 )
 
-from .fixtures import seed_history, anomaly_metrics, normal_metrics
+from .fixtures import seed_history, anomaly_metrics
 
 pytestmark = pytest.mark.integration
 

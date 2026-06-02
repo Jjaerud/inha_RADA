@@ -1,7 +1,7 @@
 """24신호 추출 — 모든 신호가 bool (0/1)이고 누락 없음."""
 from collections import deque
 from ml_server.scorer.signal_extractor import extract_signals
-from ml_server.model.requests import MetricsRequest, GpuMetrics
+from ml_server.model.requests import MetricsRequest
 
 
 EXPECTED_SIGNALS = {
