@@ -88,12 +88,46 @@ pgvector 의 `<=>` 연산자 = `1 - cos` = 기존 `_cosine_distance` 와 동일 
 
 ---
 
+## 4-1. 대규모 벤치 결과 (Phase A 완료)
+
+코퍼스 N=1k/10k/50k, 쿼리 30개 평균. mem=in-memory 전수스캔(exact),
+pg=pgvector HNSW(기본 ef_search=40). recall = pg top-3 ∩ mem top-3.
+
+| N | insert | mem 검색 | pg 검색 | **pg/mem 속도** | recall |
+|---|---|---|---|---|---|
+| 1,000 | 3.3s | 12.6ms | 1.8ms | **7×** | 100% |
+| 10,000 | 40s | 133ms | 1.6ms | **86×** | 99% |
+| 50,000 | 208s | 286ms | 1.5ms | **194×** | **47%** |
+
+**관찰 1 — 검색 성능: HNSW 압도적.**
+in-memory 는 O(N) 전수스캔이라 N 에 비례 증가(12→133→286ms), pgvector HNSW 는
+**거의 상수(~1.5ms)**. 50k 에서 **194배** 빠르고, 규모가 클수록 격차 확대.
+→ 대규모 운영(장기 누적)에서 pgvector 가 사실상 필수.
+
+**관찰 2 — recall: HNSW 근사의 한계 (★ 도입 전 해결 과제).**
+1k/10k 는 99~100% 지만 **50k 에서 47%** 로 급락. HNSW 는 근사 최근접(ANN)
+이라 후보 탐색폭(`ef_search`)이 작으면 exact top-3 를 절반만 맞춘다. 특히
+RADA 임베딩은 80차원 통계 벡터로 **정상 패턴이 촘촘**해 근접 이웃 구분이
+어렵다(ANN 이 헷갈리기 쉬운 분포).
+
+> ⚠️ recall 47% 는 retrieval evidence 의 distance 임계 판정(near_threshold)에
+> 영향을 줄 수 있다. **단, evidence 는 top-3 의 verdict 분포(NORMAL 다수 /
+> HIGH 존재) 집계**라 정확한 id 일치보다 분포 보존이 중요 — 영향은 부분적.
+
+**해결 방향 (도입 시 필수 튜닝)**:
+1. `hnsw.ef_search` 상향(기본 40 → 100~400). recall↑ ↔ latency↑ trade-off.
+   pg 검색이 1.5ms 로 워낙 빨라 ef_search 를 크게 올려도 여유 큼.
+2. 인덱스 빌드 파라미터(`m`, `ef_construction`) 상향.
+3. 또는 정확도가 결정적이면 **exact 검색**(인덱스 미사용) — 1.5ms→수십ms 라도
+   in-memory(286ms)보다 빠름. corpus 규모/품질 요구에 따라 선택.
+
+→ **결론: 성능 이점은 명백(194×). recall 은 ef_search 튜닝으로 해결해야
+하며, 이를 Phase B 의 검증 항목으로 둔다.**
+
 ## 5. 향후 계획
 
-### Phase A — 추가 검증 (③, 진행 예정)
-- **대규모 성능 벤치**: 코퍼스 N=1k/10k/50k 에서 HNSW(pgvector) vs 전수
-  스캔(in-memory) 검색 지연(latency) 비교. + insert 처리량.
-- **품질**: 대규모에서 ANN(근사) 의 recall — top-k 가 exact 와 얼마나 일치하나.
+### Phase A — 대규모 벤치 ✅ 완료 (§4-1)
+- 성능: HNSW 194× 우위 확인. recall: 50k 47% → ef_search 튜닝 과제 도출.
 
 ### Phase B — 아키텍처 결정 (정식 도입 전 필수)
 1. **ml-server ↔ DB 연결 방식**:
