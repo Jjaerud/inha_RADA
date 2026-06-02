@@ -30,8 +30,11 @@ services:
     # ${VAR} 치환은 host 셸 환경변수가 .env 보다 우선이라, host 에 빈
     # ANTHROPIC_API_KEY 가 export 돼 있으면 .env 의 실제 키를 빈값으로
     # 덮어쓴다(실제로 겪음). env_file 은 파일값을 그대로 주입해 이 문제를 피한다.
+    # required: false — .env 가 없는 환경(CI 의 compose config 검증 등)에서도
+    # 깨지지 않도록 선택적 로드. 로컬/NCP 는 .env 가 있어 그대로 주입된다.
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       RADA_POLICY_DIR: /app/ml_server/config_yaml
       TZ: Asia/Seoul
