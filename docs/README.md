@@ -33,6 +33,7 @@ docs/
 작업 중 필요할 때 찾아보는 lookup 자료.
 
 ### 운영 도구
+- [`ncp_shell_db_analysis.md`](reference/ncp_shell_db_analysis.md) — **NCP SSH 접속 + DB 분석 쿼리 + AI on/off** (운영 중 분석)
 - [`pc-provisioning.md`](reference/pc-provisioning.md) — API key 발급/회전 (`tools/provision_pcs.py`)
 - [`docker-dev.md`](reference/docker-dev.md) — 로컬 docker compose dev 환경 상세
 
