@@ -224,7 +224,60 @@ docker compose -f docker-compose.ncp.yml exec ml-server \
 
 ---
 
-## 7. 트러블슈팅
+## 7. pgvector(벡터DB) 도입 지원 확인
+
+> 배경·결론은 `docs/analysis/pgvector_adoption.md` 참고. 도입의 **전제조건**은
+> NCP **managed** Cloud DB 가 `vector` extension 을 허용하느냐다(managed 는
+> extension allow-list 가 제한적). 아래는 **확인만** 하는 절차 — 실제 설치/도입은
+> 도입 결정 후 별도 진행한다.
+
+```bash
+cd /opt/rada
+set -a && source .env && set +a
+alias radadb='PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME"'
+```
+
+### 7-1. 설치 가능 여부 (비파괴 — 읽기만)
+```bash
+# vector 가 목록에 나오면 '설치 가능'. 행이 없으면 managed 가 미지원.
+radadb -c "SELECT name, default_version, installed_version
+           FROM pg_available_extensions WHERE name='vector';"
+```
+- **행이 나옴** → 설치 가능. 7-2 로.
+- **행이 없음** → managed 가 vector 를 제공하지 않음 → 7-3(대안)으로.
+
+### 7-2. 실제 설치 권한 확인 (도입 결정 후에만)
+```bash
+# CREATE EXTENSION 은 보통 상위 권한 필요. 앱 User 로 막히면 콘솔/마스터 계정 필요.
+radadb -c "CREATE EXTENSION IF NOT EXISTS vector;"
+radadb -c "SELECT extversion FROM pg_extension WHERE extname='vector';"
+```
+- 권한 오류(`permission denied to create extension`) 시:
+  **NCP 콘솔 → Cloud DB for PostgreSQL → DB Manager / 파라미터·extension 설정**
+  에서 `vector` 활성화하거나, **마스터(관리)계정**으로 1회 실행.
+  앱 User(`$DB_USER`)에는 DDL 권한을 주지 않는 게 원칙(설치는 운영자 1회).
+
+### 7-3. 미지원 시 대안
+| 대안 | 내용 |
+|---|---|
+| (i) NCP 지원 요청 | 콘솔/티켓으로 `vector` extension 활성화 요청 |
+| (ii) 자체 PostgreSQL | NCP 가 managed 가 아닌 VM 직접 운영 PG 면 `pgvector/pgvector` 설치 가능 |
+| (iii) in-memory 유지 | 도입 보류. 현행 휘발성 retrieval 유지(소규모면 충분) |
+
+### 7-4. 지원 확인됐다면 — 도입 시 운영자 작업(요약)
+1. (위 7-2) 운영자/마스터 계정으로 `CREATE EXTENSION vector` 1회.
+2. 전용 최소권한 role 생성(부트스트랩 스크립트):
+   ```sql
+   CREATE ROLE rada_ml LOGIN PASSWORD '<강한 비밀번호>';
+   -- 테이블/GRANT 은 Flyway V9 가 처리(rada_ml 존재 시 자동 GRANT).
+   ```
+3. ml-server 에 `RETRIEVAL_BACKEND=pgvector` + `RETRIEVAL_PG_DSN`(rada_ml 계정)
+   env 주입 후 `up -d --force-recreate ml-server`.
+4. Flyway V9 가 테이블·HNSW 인덱스·GRANT 적용(앱 배포 시 자동).
+
+---
+
+## 8. 트러블슈팅
 
 | 증상 | 확인 |
 |---|---|
@@ -233,3 +286,5 @@ docker compose -f docker-compose.ncp.yml exec ml-server \
 | `radadb: command not found` | alias 는 세션 한정 — `source .env` 후 alias 재설정 |
 | is_mock 전부 true | ANTHROPIC_API_KEY 미적용(`env_file: .env` 확인) 또는 MEDIUM+ anomaly 미발생 |
 | 한글 깨짐 | 터미널 UTF-8 설정 (`export LANG=ko_KR.UTF-8` 또는 PuTTY 인코딩) |
+| `vector` 미지원 | 7-1 결과 무행 → managed 미제공. 7-3 대안(콘솔 활성화/자체 PG/보류) |
+| `permission denied to create extension` | 앱 User DDL 권한 없음 — 콘솔 또는 마스터 계정으로 1회 설치(7-2) |
