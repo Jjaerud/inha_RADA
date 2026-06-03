@@ -48,6 +48,9 @@ tools/_*.csv
 tools/provisioned_keys*.csv
 tools/*.key
 provisioned_keys*.csv
+# sim_fleet 로컬 발급 키/대상 (raw 키 포함 — 절대 커밋 금지)
+sim_keys*.csv
+sim_pcs*.csv
 
 # pgvector 로컬 전용 (커밋 안 함)
 # - override.yml: 개인용 auto-load pgvector overlay (공용은 docker-compose.pgvector.yml)
