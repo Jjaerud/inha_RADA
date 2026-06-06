@@ -3,108 +3,80 @@ from typing import Dict, Any
 from ..model.requests import MetricsRequest
 
 
+_PROFILE_DESC = {
+    "general": "고부하 연산이 통상적이지 않은 환경(공용/강의장/도서관 등). 보수적으로 판단.",
+    "lab_compute_allowed": ("과학연산/렌더링 등 고부하가 업무상 그럴듯한 환경(연구실). "
+                            "단 이것이 채굴 면죄부는 아니며, 반드시 반증을 따질 것."),
+}
+
+
 def build_prompt(metrics: MetricsRequest, pattern_result: dict,
                  global_hw: dict) -> str:
-    alerts_text = "\n".join(
-        [f"- [{a['severity']}] {a['type']}: {a['detail']}" for a in pattern_result["alerts"]]
-    )
-    procs_text = "\n".join(
-        [f"- {p['name']} (CPU {p['cpu_percent']}%, MEM {p['memory_percent']}%, {p['path']})"
-         for p in metrics.top_processes[:5]]
-    )
-    # #3 (PID 귀속): 외부 연결을 소유한 프로세스 경로. 저-CPU 라 top_processes 에
-    # 안 잡혀도 백도어/채굴 소유 프로세스를 AI 가 직접 볼 수 있게 한다.
-    conn_owner_text = ""
+    """탈앵커링 프롬프트(ai_judgment_disambiguation_design §4-4).
+
+    룰 결론/점수/유사사례를 단정적으로 주입하지 않는다(앵커링 제거). 대신 중립
+    관측 사실 + 환경 프로파일을 주고, 채굴 vs 정상 워크로드 양가설을 비교하게 한다.
+    하드 신호(known_miner/mining_pool)는 환경 무관 위험으로 명시.
+    """
+    signals = pattern_result.get("signals", {}) or {}
+    g = metrics.gpu
+    if g:
+        vram_t = (g.memory_total_mb or 1) or 1
+        gpu_line = (f"load {g.load_percent}%, 텐서코어 {g.tensor_core_active}(0=미사용), "
+                    f"VRAM {g.memory_used_mb}/{vram_t}MB(={(g.memory_used_mb or 0)/vram_t*100:.0f}%), "
+                    f"전력 {g.power_draw_w}W")
+    else:
+        gpu_line = "(GPU 메트릭 없음/수집 실패)"
+    procs = "\n".join(
+        f"  - {p.get('name')} (CPU {p.get('cpu_percent')}%, 경로: {p.get('path','')})"
+        for p in metrics.top_processes[:5]) or "  - (없음)"
     conn_lines = []
     for c in (metrics.external_connections or [])[:5]:
-        if not isinstance(c, dict):
-            continue
-        owner = c.get("proc_name") or "?"
-        opath = c.get("proc_path") or ""
-        conn_lines.append(f"- {c.get('ip','?')}:{c.get('port','?')} ← {owner} {opath}".rstrip())
-    if conn_lines:
-        conn_owner_text = "\n[외부 연결 소유 프로세스]\n" + "\n".join(conn_lines)
-    gpu_text = ""
-    if metrics.gpu:
-        gpu_text = (f"GPU {metrics.gpu.load_percent}%, VRAM {metrics.gpu.memory_used_mb}MB, "
-                    f"SM {metrics.gpu.sm_utilization}%, 텐서코어 {metrics.gpu.tensor_core_active}%, "
-                    f"전력 {metrics.gpu.power_draw_w}W")
+        if isinstance(c, dict):
+            conn_lines.append(
+                f"  - {c.get('ip','?')}:{c.get('port','?')} ← "
+                f"{c.get('proc_name','?')} {c.get('proc_path','')}".rstrip())
+    conns = "\n".join(conn_lines) or "  - (없음/일반)"
+    profile = getattr(metrics, "workload_context", "general") or "general"
+    profile_desc = _PROFILE_DESC.get(profile, _PROFILE_DESC["general"])
+    global_hw_text = (f"\n- 전체 PC 노후화 신호: {global_hw.get('detail','')}"
+                      if global_hw.get("detected") else "")
 
-    global_hw_text = ""
-    if global_hw.get("detected"):
-        global_hw_text = f"\n[전체 PC 노후화 신호]\n{global_hw.get('detail','')}"
+    return f"""당신은 공유 PC 보안·유지보수 분석가입니다. 규칙엔진이 자원 사용이 높아 이 PC를
+'검토 대상'으로 표시했습니다. 그러나 높은 자원 사용 자체는 채굴과 정상 고부하 작업
+(과학연산/렌더링/인코딩/빌드) 양쪽에서 동일하게 나타납니다. 당신의 임무는 점수를
+재확인하는 게 아니라 이 둘을 구별하는 것입니다.
 
-    retrieval_text = ""
-    ev = pattern_result.get("retrieval_evidence")
-    if isinstance(ev, dict) and ev.get("available"):
-        top_k_lines = []
-        for c in ev.get("top_k", [])[:3]:
-            top_k_lines.append(
-                f"- {c.get('segment_id')} dist={c.get('distance')} "
-                f"verdict={c.get('verdict')} score={c.get('score')}"
-            )
-        topk_block = "\n".join(top_k_lines) if top_k_lines else "- 없음"
-        retrieval_text = (
-            f"\n[유사 과거 사례 top-k]\n{topk_block}\n"
-            f"[Peer 비교] same_slot_peers={ev.get('same_slot_peer_count',0)} "
-            f"peer_mismatch={ev.get('peer_mismatch',False)} "
-            f"retrieval_score={ev.get('retrieval_score',0)}\n"
-        )
+[배포 환경 프로파일]
+workload_context = {profile}
+  → {profile_desc}
 
-    scores   = pattern_result.get("scores", {})
-    verdict  = pattern_result.get("verdict", "NORMAL")
-    signals  = pattern_result.get("signals", {})
-    active_s = [k for k, v in signals.items() if v and k not in ("is_gaming","is_compiling")]
+[관측 사실]  (판정이 아니라 측정값)
+PC={metrics.pc_id}, 시간표={pattern_result.get('timetable_slot','?')}
+- CPU 사용률: {metrics.cpu_percent}%, 메모리: {metrics.memory_percent}%
+- GPU: {gpu_line}
+- Net ↑{metrics.outbound_mb}MB/5s ↓{metrics.inbound_mb}MB/5s, 외부패킷 {metrics.external_packet_count}건
+- 상위 프로세스:
+{procs}
+- 외부 연결(소유 프로세스):
+{conns}
+- 알려진 채굴 프로세스명 일치: {'예' if signals.get('known_miner') else '아니오'}
+- 알려진 채굴풀 IP 일치: {'예' if signals.get('mining_pool_ip') else '아니오'}{global_hw_text}
 
-    # 해석 레이어 (additive — 점수 미반영, 판단 참고용)
-    interp_text = ""
-    rv = scores.get("risk_vector") if isinstance(scores, dict) else None
-    if isinstance(rv, dict):
-        interp_text += (
-            f"\n[위험 벡터 해석] primary={rv.get('primary_type','NORMAL')} "
-            f"(채굴:{rv.get('mining',0)} 오작동:{rv.get('malfunction',0)} "
-            f"노후화:{rv.get('aging',0)} 보안위협:{rv.get('threat',0)} "
-            f"네트워크남용:{rv.get('network_abuse',0)})"
-        )
-    sq = pattern_result.get("signal_quality")
-    if isinstance(sq, dict) and sq.get("overall") and sq.get("overall") != "FULL":
-        interp_text += (
-            f"\n[신호 품질] overall={sq.get('overall')} "
-            f"저하출처={sq.get('degraded_sources', [])} "
-            f"(품질 저하 시 해당 신호의 0/False 는 '정상'이 아니라 '측정 불가'일 수 있음)"
-        )
-    ec = pattern_result.get("explanation_confidence")
-    if isinstance(ec, dict) and ec.get("level"):
-        interp_text += (
-            f"\n[설명 신뢰도] level={ec.get('level')} score={ec.get('score',0)}/5 "
-            f"근거={ec.get('reasons', [])}"
-        )
+[판단 절차 — 반드시 이 순서로]
+1. 악의적 채굴 가설: 지지 증거는?
+2. 정상 워크로드 가설: 지지 증거는?(프로세스 정체성/설치 경로/텐서·VRAM 사용양상/환경)
+3. 채굴 반증·누락 증거: 채굴풀 연결 없음 / 알려진 채굴 아님 / 텐서코어 활성(=ML학습) /
+   VRAM 높음(=일반 GPU작업) / Program Files 정식 설치 등
+4. 종합 판단
 
-    return f"""당신은 공용 PC 보안 및 유지보수 분석 전문가입니다.
-아래 데이터를 분석해 이상 여부를 판단하고 report_judgment 도구로 보고하세요.
+[중요 규칙]
+- '알려진 채굴 프로세스명 일치=예' 또는 '채굴풀 IP 일치=예' 이면 환경 프로파일과
+  무관하게 정상으로 판단하지 말 것.
+- 그 외 자원-시그니처만 있으면, 위 반증과 프로파일을 종합해 benign_workload_likely 판단.
 
-[현재 메트릭]
-PC={metrics.pc_id}, 시각={metrics.timestamp}, 시간표={pattern_result['timetable_slot']}
-CPU={metrics.cpu_percent}%, 메모리={metrics.memory_percent}%
-{gpu_text}
-외부연결={metrics.external_packet_count}건, Net ↑{metrics.outbound_mb}MB/5s ↓{metrics.inbound_mb}MB/5s
-{global_hw_text}
-{retrieval_text}
-[규칙 기반 스코어링 결과]
-verdict={verdict} (NORMAL|OBSERVE|SUSPICIOUS|HIGH_RISK), 최종점수={scores.get('final',0):.1f}
-(GPU채굴:{scores.get('gpu_mining',0)} CPU채굴:{scores.get('cpu_mining',0)} 스텔스:{scores.get('stealth',0)} 유출:{scores.get('exfil',0)} 프로세스:{scores.get('process',0)})
-컨텍스트배율={scores.get('context_multiplier',1.0)} (게임={signals.get('is_gaming',False)}, 컴파일={signals.get('is_compiling',False)})
-활성신호={active_s}
-{interp_text}
-[탐지 알람]
-{alerts_text if alerts_text else "- 이상 없음"}
-
-[프로세스]
-{procs_text}
-{conn_owner_text}
-
-판단 결과를 report_judgment 도구로 보고하세요.
-(reason 은 1~2문장 간결히, action 은 1문장)""".strip()
+report_judgment 도구로 보고하세요(benign_workload_likely / benign_confidence /
+contradicting_mining_evidence 포함). reason 1~2문장(≤140자), action 1문장(≤70자).""".strip()
 
 
 def call_claude_api(prompt: str) -> dict:
@@ -146,7 +118,7 @@ def call_claude_api(prompt: str) -> dict:
 # Structured-output 스키마. messages API 의 tools 파라미터로 전달.
 _JUDGMENT_TOOL = {
     "name": "report_judgment",
-    "description": "공용 PC 이상 분석의 최종 판단을 보고한다.",
+    "description": "공유 PC 자원 이상의 최종 판단을 보고한다.",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -154,12 +126,21 @@ _JUDGMENT_TOOL = {
                          "description": "종합 판정"},
             "severity": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"],
                          "description": "심각도"},
-            "reason": {"type": "string", "description": "판단 근거를 한국어 1~2문장으로 간결히(최대 120자)."},
-            "action": {"type": "string", "description": "구체적 추천 조치를 한국어 1문장으로(최대 60자)."},
+            "benign_workload_likely": {"type": "boolean",
+                "description": "정상 고부하 워크로드(과학연산/렌더/인코딩/빌드 등)일 가능성이 높은가. "
+                               "축 A(악성 여부)만 판단 — 인가 여부(축 B)는 운영자 정책이 별도로 본다."},
+            "benign_confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"],
+                                  "description": "benign_workload_likely 의 확신도"},
+            "contradicting_mining_evidence": {"type": "array", "items": {"type": "string"},
+                "description": "채굴 가설을 반증하는 관측들(예: no_mining_pool, not_known_miner, "
+                               "tensor_active, vram_high, progfiles_signed_path)"},
+            "reason": {"type": "string", "description": "판단 근거를 한국어 1~2문장으로 간결히(최대 140자)."},
+            "action": {"type": "string", "description": "구체적 추천 조치를 한국어 1문장으로(최대 70자)."},
             "hw_degradation": {"type": "string", "enum": ["NONE", "SUSPECTED", "CONFIRMED"],
                                "description": "하드웨어 노후/오류 여부"},
         },
-        "required": ["judgment", "severity", "reason", "action", "hw_degradation"],
+        "required": ["judgment", "severity", "benign_workload_likely", "benign_confidence",
+                     "contradicting_mining_evidence", "reason", "action", "hw_degradation"],
     },
 }
 

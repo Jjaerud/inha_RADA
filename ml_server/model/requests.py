@@ -42,6 +42,9 @@ class MetricsRequest(BaseModel):
     local_alerts:           List[dict] = Field(default_factory=list)
     boxplot_signal:         dict       = Field(default_factory=dict)
     derived_features:       Optional[Dict[str, Any]] = None
+    # 배포 환경 프로파일(ai_judgment_disambiguation_design). Spring이 pc_info에서
+    # 주입. 기본 'general'(보수). AI 판단 시 프롬프트 맥락으로만 사용(additive).
+    workload_context:       str = "general"
 
     @field_validator("timestamp")
     @classmethod
