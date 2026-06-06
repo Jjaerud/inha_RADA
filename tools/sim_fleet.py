@@ -821,8 +821,103 @@ def _fp_video_encode(p: dict, i: int) -> dict:
     return p
 
 
+# ───── 레드팀 2차: 또 다른 정상 활동으로 오탐 노림(non-fast-path) ─────
+def _fp_hashcat(p: dict, i: int) -> dict:
+    """[FP노림] 보안연구 비밀번호 감사(hashcat GPU) — GPU flat+VRAM낮음+텐서0 = 채굴 동일."""
+    p["cpu_percent"] = 7.0 + random.uniform(0, 4)
+    p["gpu"].update(load_percent=98.0 + (i % 2), memory_used_mb=800.0, memory_percent=6.5,
+                    sm_utilization=99, tensor_core_active=0, power_draw_w=200.0, temperature=84.0)
+    p["external_packet_count"] = 9; p["outbound_mb"] = 1.0
+    p["top_processes"] = [
+        {"pid": 6101, "name": "hashcat.exe", "cpu_percent": 5.0, "memory_percent": 4.0,
+         "path": PROGFILES + r"\hashcat\hashcat.exe"},
+        {"pid": 1200, "name": "chrome.exe", "cpu_percent": 3.0, "memory_percent": 9.0, "path": CHROME}]
+    p["derived_features"].update(unique_remote_ip_count=3)
+    return p
+
+
+def _fp_ansys(p: dict, i: int) -> dict:
+    """[FP노림] 공학 CAE 시뮬(ANSYS) — CPU+GPU 동시 flat 고부하."""
+    p["cpu_percent"] = 93.0 + (i % 4)
+    p["gpu"].update(load_percent=90.0 + (i % 4), memory_used_mb=1400.0, memory_percent=11.4,
+                    sm_utilization=92, tensor_core_active=0, power_draw_w=160.0, temperature=79.0)
+    p["external_packet_count"] = 9; p["outbound_mb"] = 1.0
+    p["top_processes"] = [
+        {"pid": 6102, "name": "ansys.exe", "cpu_percent": 90.0, "memory_percent": 30.0,
+         "path": PROGFILES + r"\ANSYS Inc\v242\ansys.exe"},
+        {"pid": 1200, "name": "chrome.exe", "cpu_percent": 2.0, "memory_percent": 9.0, "path": CHROME}]
+    p["derived_features"].update(top_process_cpu_sum_normalized=0.9, unique_remote_ip_count=3)
+    return p
+
+
+def _fp_genomics(p: dict, i: int) -> dict:
+    """[FP노림] 생물정보 파이프라인(samtools) — CPU flat 96% + 디스크 대량."""
+    p["cpu_percent"] = 96.0 + (i % 3)
+    p["gpu"].update(load_percent=4.0, sm_utilization=2)
+    p["disk_read_mb"] = 40.0; p["disk_write_mb"] = 25.0
+    p["external_packet_count"] = 9; p["outbound_mb"] = 1.0
+    p["top_processes"] = [
+        {"pid": 6103, "name": "samtools.exe", "cpu_percent": 94.0, "memory_percent": 18.0,
+         "path": PROGFILES + r"\bioinfo\samtools.exe"},
+        {"pid": 1200, "name": "chrome.exe", "cpu_percent": 1.0, "memory_percent": 9.0, "path": CHROME}]
+    p["derived_features"].update(top_process_cpu_sum_normalized=0.94, unique_remote_ip_count=3)
+    return p
+
+
+def _fp_unreal(p: dict, i: int) -> dict:
+    """[FP노림] 언리얼 셰이더 컴파일+프리뷰 — CPU 다코어 풀가동 + GPU."""
+    p["cpu_percent"] = 95.0 + (i % 3)
+    p["gpu"].update(load_percent=65.0 + (i % 6), memory_used_mb=3000.0, memory_percent=24.4,
+                    sm_utilization=70, tensor_core_active=0, power_draw_w=140.0, temperature=75.0)
+    p["external_packet_count"] = 9; p["outbound_mb"] = 1.0
+    p["top_processes"] = [
+        {"pid": 6104, "name": "unrealeditor.exe", "cpu_percent": 92.0, "memory_percent": 35.0,
+         "path": PROGFILES + r"\Epic Games\UE_5.4\Engine\Binaries\Win64\UnrealEditor.exe"},
+        {"pid": 1200, "name": "chrome.exe", "cpu_percent": 2.0, "memory_percent": 9.0, "path": CHROME}]
+    p["derived_features"].update(top_process_cpu_sum_normalized=0.92, unique_remote_ip_count=3)
+    return p
+
+
+def _fp_blockchain_node(p: dict, i: int) -> dict:
+    """[FP노림] 블록체인 풀노드 연구(geth) — CPU 중간 + 지속 outbound + 다수 피어."""
+    p["cpu_percent"] = 60.0 + random.uniform(0, 12)
+    p["disk_write_mb"] = 8.0; p["outbound_mb"] = 4.0
+    p["external_packet_count"] = 50 + i; p["external_connection_count"] = 40
+    p["external_connections"] = [
+        {"pid": 6105, "proc_name": "geth.exe", "proc_path": PROGFILES + r"\geth\geth.exe",
+         "ip": f"34.0.{i%255}.{(i*7)%255}", "port": 30303, "status": "ESTABLISHED"}]
+    p["top_processes"] = [
+        {"pid": 6105, "name": "geth.exe", "cpu_percent": 55.0, "memory_percent": 20.0,
+         "path": PROGFILES + r"\geth\geth.exe"},
+        {"pid": 1200, "name": "chrome.exe", "cpu_percent": 3.0, "memory_percent": 9.0, "path": CHROME}]
+    p["derived_features"].update(unique_remote_ip_count=38, duplicate_connection_count=2)
+    return p
+
+
+def _fp_pytorch_ddp(p: dict, i: int) -> dict:
+    """[FP노림] 분산 ML 학습(PyTorch DDP) — GPU 고부하지만 텐서 활성+VRAM 높음+gradient 동기 outbound."""
+    p["cpu_percent"] = 40.0 + random.uniform(0, 10)
+    p["gpu"].update(load_percent=96.0 + (i % 3), memory_used_mb=11000.0, memory_percent=89.5,  # VRAM 높음
+                    sm_utilization=94, tensor_core_active=85,   # 텐서 활성 = 진짜 학습
+                    power_draw_w=220.0, temperature=81.0)
+    p["disk_read_mb"] = 15.0; p["outbound_mb"] = 9.0      # gradient all-reduce
+    p["external_packet_count"] = 30 + i; p["external_connection_count"] = 4
+    p["top_processes"] = [
+        {"pid": 6106, "name": "python.exe", "cpu_percent": 38.0, "memory_percent": 40.0,
+         "path": r"C:\Users\lab\miniconda3\envs\torch\python.exe"},
+        {"pid": 1200, "name": "chrome.exe", "cpu_percent": 3.0, "memory_percent": 9.0, "path": CHROME}]
+    p["derived_features"].update(top_process_cpu_sum_normalized=0.38, unique_remote_ip_count=4)
+    return p
+
+
 SCENARIOS = {
     "normal":          lambda p, i: p,
+    "fp_hashcat":        _fp_hashcat,        # 보안연구 비번감사
+    "fp_ansys":          _fp_ansys,          # CAE 시뮬
+    "fp_genomics":       _fp_genomics,       # 생물정보 CPU+디스크
+    "fp_unreal":         _fp_unreal,         # 언리얼 셰이더
+    "fp_blockchain_node":_fp_blockchain_node,# 풀노드(CPU+다수피어)
+    "fp_pytorch_ddp":    _fp_pytorch_ddp,    # 분산학습(텐서활성+VRAM높음+net)
     # ── 채굴(fast-path, 알려진 프로세스 → 즉시 HIGH) ──
     "miner":           _miner,           # CPU 채굴(xmrig)
     "miner_gpu":       _miner_gpu,       # GPU 채굴(t-rex)
