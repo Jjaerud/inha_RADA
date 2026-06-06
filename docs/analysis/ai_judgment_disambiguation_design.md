@@ -61,6 +61,9 @@
 - `mining_pool_ip` 가 제외인 이유: 다름 — **흔한 정상 클라우드 IP를 오인하는 저정밀**
   신호라서(과거 PC-01 FP 주범). 현재 `MINING_POOL_IPS=∅` 로 비활성. 부활하려면
   `/16` prefix 금지·정확 단일 IP(위협 인텔)·검증 전 하드 승격 금지.
+- `confirmed_sustained`(행동 게이팅 mining_confirmed) 가 **하드 아님**인 이유: 이름은
+  "confirmed" 지만 **프로세스 정체성 없는 행동 패턴**이라, 정상 장기연산이 3.5h 만에
+  trivially 발동(일주일 테스트로 실증). → known_miner 와 같은 등급 금지. 상세 §4-8.
 
 ---
 
@@ -210,6 +213,77 @@ trusted_app·프로파일·AI 는 **축 A(악성 여부)** 만 답한다. **축 
 
 ---
 
+### 4-8. 행동 게이팅(category_gating) 처리 — `confirmed_sustained` 강등
+
+**문제(일주일 sustained 테스트로 발견)**: 정상 장기 GPU/CPU 연산이
+resource+network+system 카테고리를 오래 만족하면, 행동 기반 category_gating 이
+~30분에 SUSPICIOUS, **~180분(~3.5h)에 HIGH(mining_confirmed)** 로 승격한다.
+프로세스·풀 증거 없이 verdict 가 HIGH FP. 단기(≤200분) 테스트는 180분 임계를 못
+넘어 이걸 못 봤다.
+
+**근본 원인 — "confirmed" 두 개의 증거 등급이 다름**:
+
+| 신호 | 근거 | 등급 |
+|---|---|---|
+| `CONFIRMED_MINING` | known_miner / process_score≥10 = **프로세스 정체성** | **하드 유지** |
+| `MINING_CONFIRMED_BY_BEHAVIOR` | category_gating sustained = **행동 패턴** | **하드 아님 → 강등** |
+
+이름이 둘 다 "confirmed" 라 같아 보이지만 증거 등급이 완전 다르다. 이 충돌이 위험의
+근원. xmrig 같은 고정밀 증거와 같은 등급으로 두면 안 된다.
+
+**결정**:
+1. `CONFIRMED_MINING`(known_miner / persistent / process≥10) → **하드 유지**.
+2. `MINING_CONFIRMED_BY_BEHAVIOR` → **리네임 `BEHAVIORAL_MINING_SUSPECT`**
+   (confirmed→suspect: "의심이지 확정 아님" 명확화).
+3. `promotion_gating.fast_path` 에서 **`confirmed_sustained` 제거** ← 실질적 강등 포인트.
+4. **행동-단독 category_gating 최대 verdict = SUSPICIOUS** (옵션 ④ 채택).
+   HIGH_RISK 는 **known_miner 또는 정밀 IOC 동반 시에만**. ← 핵심 구조적 방어.
+5. AI/profile 은 행동 게이팅 SUSPICIOUS 를 disambiguation. severity 기록 보존,
+   표시/알림만 완화.
+
+> **원칙 한 줄**: HIGH 는 **정체성 증거**가 있을 때만. **행동 패턴만으로는 SUSPICIOUS 까지.**
+> → 정상 장기 COMSOL/GROMACS/Houdini 가 3.5h 돌았다고 바로 HIGH 되는 걸 구조적으로 차단.
+
+**실증(4질의, 깨끗한 데이터)**: 행동 게이팅 HIGH 로 떴던 4개 장기연산 → AI 전부
+benign=True. ①②④(COMSOL/GROMACS/Houdini) NORMAL 구제, ③(generic python+외부IP)
+benign 이나 SUSPICIOUS 경계 유지(외부통신 리스크 분리 = §4-7 두 축 발현).
+
+**구현 touchpoint**(구현 시):
+- `scoring_policy.yaml`: `gating.mining_confirmed` 이름/정책, `promotion_gating.fast_path`
+  에서 `confirmed_sustained` 제거.
+- `category_gating.py`: `alert_type` 변경, **행동-단독 HIGH 제한(max SUSPICIOUS) 로직**.
+- `analyze_router.py`: `alert_type == MINING_CONFIRMED_BY_BEHAVIOR` 체크 +
+  `fast_path_match=confirmed_sustained` 주입 제거/변경.
+- `verdict_classifier.py`: fast_path 처리 영향 확인.
+- Grafana/문서: alert type 이름 반영.
+
+**잔여 리스크(정직)**: 완벽 위장 채굴(정상 서명 바이너리 + Program Files + 풀 숨김 +
+외부 IP 없음 + 순수 GPU sustained)은 **정상 장기연산과 관측값이 동일** → 원리적 구분
+불가에 가깝다. 안전망: **완전 묵음 금지, digest 유지, operator review, operator-
+authorized 일 때만 묵음**(§4-5/§4-7).
+
+### 4-9. AI 구제의 도메인 한계 + 인프라 known-good (운영 실증)
+
+**발견(2026-06, 운영 PC-01)**: 본 설계의 AI 디스앰비규에이션은 **compute-vs-mining
+FP엔 강하나(레드팀 8/8 구제), network/인프라 자기참조 FP엔 무력하고 위험**하다.
+
+**실증**: PC-01(운영자 머신)이 **RADA 서버 자신**(`223.130.154.165:8080/3000/22`)에
+메트릭 전송·Grafana 조회·SSH 하는 정상 트래픽 → SUSPICIOUS_EXFIL FP. 이를 실제 Claude에
+질의 → **DANGEROUS 판정 + "rada_client.exe·claude.exe 격리" 권고**(=감시 에이전트를
+죽이라는 셈). AI가 "단일 IP 다중포트=C&C", "ProgramData 경로=의심"으로 오인.
+
+**원칙**:
+1. **AI 구제는 도메인 특이적이다.** compute(자원) FP만 신뢰. network/exfil/인프라 FP는
+   AI에 위임하지 말 것(현 프롬프트는 compute-vs-mining 전용).
+2. **known-good 컨텍스트가 AI보다 우선이다.** 다음을 룰·AI 이전 단계에서 화이트리스트:
+   - **자기 인프라**: RADA 서버 IP/포트(metrics 8080, Grafana 3000, SSH 22).
+   - **자기 에이전트**: `rada_client.exe`(설치 경로 ProgramData 포함).
+3. **EXFIL 도메인은 별도 처리**: network-only cap(이미 존재) + PID 귀속 owner 검사.
+   compute 프롬프트로 네트워크 케이스를 판단시키지 말 것.
+
+**touchpoint**(구현 시): config 화이트리스트(인프라 IP/포트, rada_client), 프롬프트에
+"이 PC는 RADA 자체 모니터링 트래픽을 발생시킨다"는 컨텍스트(필요 시), EXFIL 판단 분기.
+
 ## 5. 회귀 테스트 매트릭스 (안전성 게이트)
 
 `tools/sim_fleet.py` 로 실증. **3번이 통과해야 설계가 안전**(FN 미발생 보장).
@@ -229,6 +303,20 @@ trusted_app·프로파일·AI 는 **축 A(악성 여부)** 만 답한다. **축 
 - ⚠️ **pool 동반은 #6에서 제외**: `mining_pool_ip` 는 현재 비활성·하드 아님(§3). 따라서
   "pool-only 동반"은 **지금은 HIGH 가 아니다**. 정밀 IOC 로 재도입(정확 IP+FP게이트)된
   뒤에야 별도 정책으로 HIGH 가능 — 그때 #6b 로 추가한다.
+
+### 5-1. 행동 게이팅 강등 회귀(§4-8 채택 전 필수)
+
+| # | 입력 | 프로파일 | 기대 | 검증 |
+|---|---|---|---|---|
+| 8 | **리네임된 miner(temp/appdata 경로)** | lab_compute_allowed | **SUSPICIOUS 유지(AI benign 안 함)** | **evasion 방어** — known_miner 우회했어도 temp 경로+sustained 를 AI 가 무겁게 |
+| 9 | generic python + 의심 외부 IP | lab_compute_allowed | benign 가능성 인정하되 **SUSPICIOUS 유지** | §4-7 두 축(③ 실증) |
+| 10 | 정상 장기연산(COMSOL/GROMACS) 8h~7d | lab_compute_allowed | **행동게이팅이 HIGH 안 만듦(max SUSPICIOUS)** + AI benign badge | §4-8 옵션④ 구조적 방어 |
+| 11 | known_miner + 장기 sustained | lab_compute_allowed | **HIGH 유지** | 하드+행동 동반 시 HIGH 정당 |
+| 12 | public/general + 장기 고부하 무사용자 | general | 완화 안 함(digest/SUSPICIOUS) | 환경 차등 |
+
+- **#8 이 핵심 evasion 테스트**: xmrig 를 `svc.exe` 로 리네임해 temp 에 둔 경우 →
+  known_miner 미발화지만 AI 가 temp 경로+의심 시그니처로 SUSPICIOUS 유지하는지.
+- **#10 이 §4-8 옵션④ 검증**: 정상 장기연산이 **HIGH 로 승격되지 않는지**(행동-단독 상한).
 
 ---
 
@@ -261,6 +349,7 @@ trusted_app·프로파일·AI 는 **축 A(악성 여부)** 만 답한다. **축 
 | 알림 완화 정도 | 완전 억제 금지 → 저우선순위/digest | human-in-loop. **완전 묵음은 trusted_app 아니라 operator-authorized 라벨(§4-7)에만** |
 | general 빈발 정상 피드백 | 통계 자동학습 금지 → 명시 정책 행동(재프로파일 / 트러스트앱 추가, 감사) + "자주 뜨고 AI-benign" 리포트 | FN 피드백 루프 회피 |
 | (추가) 트러스트앱 레이어 | §4-6 — **Phase A 표시만 / Phase B signer 검증 후 결정적**, 프로파일 게이트 | 알려진 정상앱은 (Phase B 이후) AI 전 결정적 처리(호출↓·신뢰↑) |
+| **`confirmed_sustained` 강등**(§4-8) | 하드에서 제외 → fast_path 제거 + 행동-단독 max SUSPICIOUS + 리네임 `BEHAVIORAL_MINING_SUSPECT` | 일주일 테스트: 정상 장기연산이 3.5h만에 행동HIGH FP. 정체성 증거 아님 |
 
 ### 남은 결정 (작게)
 - `workload_context` 확장 enum 범위(render_farm/build_server 등) — 도입 시점에 결정.
@@ -290,6 +379,7 @@ trusted_app·프로파일·AI 는 **축 A(악성 여부)** 만 답한다. **축 
 general, Spring 주입)로, 판정은 **트러스트앱(Phase A=표시만 / Phase B=signer 검증 후
 결정적, 프로파일 게이트) → AI 비파괴 자문(confidence 티어링, 표시/알림만 완화)** 순서로,
 하드 신호(known_miner)는 항상 에스컬레이션. 완전 묵음은 trusted_app 이 아니라
-**operator-authorized 라벨**에만. severity 는 불변, 자동 하향은 검증 후. Sonnet으로
-충분하되 **회귀(특히 #3/#6 lab_compute_allowed+실채굴=HIGH, #5 스푸핑)** 로 FN·스푸핑
-안전성을 실증한 뒤 단계적 활성화.
+**operator-authorized 라벨**에만. severity 는 불변, 자동 하향은 검증 후.
+**HIGH 는 정체성 증거가 있을 때만 — 행동 패턴(`confirmed_sustained`)만으로는 SUSPICIOUS
+까지**(§4-8 강등). Sonnet으로 충분하되 **회귀(#3/#6 실채굴=HIGH, #5 스푸핑, #8 evasion,
+#10 행동HIGH 상한)** 로 FN·스푸핑·장기 안전성을 실증한 뒤 단계적 활성화.
