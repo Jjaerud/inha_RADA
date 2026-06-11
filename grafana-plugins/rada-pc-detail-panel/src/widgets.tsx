@@ -101,6 +101,12 @@ function sevPalette(sev: number) {
   const angles = [270, 330, 30, 90, 150, 210];
   return angles.map((angle, i) => ({ angle, color: cols[i] }));
 }
+// 오프라인 — 회색 계열 발광
+const GRAY_LOBES = ['#9aa0bd', '#aeb4ce', '#c3c8df', '#8b91ad', '#b4bad2', '#7e84a0'];
+function grayPalette() {
+  const angles = [270, 330, 30, 90, 150, 210];
+  return angles.map((angle, i) => ({ angle, color: GRAY_LOBES[i] }));
+}
 function makeStars(n: number, seed: number) {
   const out: any[] = []; let s = seed;
   const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
@@ -109,8 +115,10 @@ function makeStars(n: number, seed: number) {
 }
 const STARS = makeStars(20, 7321);
 export function StatusCard({ pc, grade }: any) {
-  const c = gColor(grade.sev);
-  const word = grade.sev >= 3 ? '위험' : grade.sev >= 1 ? '의심' : '정상';
+  const offline = pc.online === false;
+  const c = offline ? RADA.fgMuted : gColor(grade.sev);
+  const word = offline ? '오프라인' : (grade.sev >= 3 ? '위험' : grade.sev >= 1 ? '의심' : '정상');
+  const palette = offline ? grayPalette() : sevPalette(grade.sev);
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', height: '100%', width: '100%', padding: '14px 20px', gap: 14, background: '#090d1e', overflow: 'hidden' }}>
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
@@ -121,7 +129,7 @@ export function StatusCard({ pc, grade }: any) {
         ))}
       </svg>
       <div style={{ position: 'relative', zIndex: 1, flex: '0 0 auto' }}>
-        <BlobGauge value={pc.id} unit="" label="장비" size={118} palette={sevPalette(grade.sev)} />
+        <BlobGauge value={pc.id} unit="" label="장비" size={118} palette={palette} />
       </div>
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
         <span style={{ fontFamily: RADA.ui, fontSize: 10.5, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>PC 상태</span>
