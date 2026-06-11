@@ -1,15 +1,37 @@
 {
-  "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
   "editable": true,
   "graphTooltip": 1,
   "id": null,
   "uid": "rada-pc-detail",
   "title": "RADA — PC Detail",
-  "tags": ["rada", "pc", "detail"],
+  "tags": [
+    "rada",
+    "pc",
+    "detail"
+  ],
   "timezone": "Asia/Seoul",
   "schemaVersion": 39,
   "version": 3,
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "refresh": "5s",
   "templating": {
     "list": [
@@ -17,7 +39,10 @@
         "name": "pc_id",
         "label": "PC",
         "type": "query",
-        "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "rada_pg"
+        },
         "query": "SELECT pc_id FROM pc_info ORDER BY pc_id",
         "refresh": 2,
         "includeAll": false,
@@ -31,14 +56,25 @@
       "type": "rada-pc-detail-panel",
       "title": "",
       "transparent": true,
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "h": 30, "w": 24, "x": 0, "y": 0 },
-      "options": { "demoMode": false, "demoPc": "PC-07" },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "rada_pg"
+      },
+      "gridPos": {
+        "h": 30,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "demoMode": false,
+        "demoPc": "PC-07"
+      },
       "targets": [
         {
           "refId": "meta",
           "format": "table",
-          "rawSql": "SELECT (scores->'panel')::text AS panel FROM anomaly_history WHERE pc_id = '$pc_id' ORDER BY detected_at DESC LIMIT 1"
+          "rawSql": "SELECT (COALESCE( a.scores->'panel', jsonb_build_object( 'id', a.pc_id, 'online', true, 'score', COALESCE((a.scores->>'final')::float,0), 'cpu',0,'gpu',0,'mem',0, 'scoreSpark', COALESCE((SELECT jsonb_agg(s ORDER BY dt) FROM (SELECT (a2.scores->>'final')::float s, a2.detected_at dt FROM pc_monitor.anomaly_history a2 WHERE a2.pc_id=a.pc_id ORDER BY a2.detected_at DESC LIMIT 30) z), '[]'::jsonb), 'risk', jsonb_build_array( jsonb_build_object('axis','채굴','value', least(1.0,COALESCE((a.scores->'risk_vector'->>'mining')::float,0)/10.0)), jsonb_build_object('axis','오작동','value', least(1.0,COALESCE((a.scores->'risk_vector'->>'malfunction')::float,0)/10.0)), jsonb_build_object('axis','노후화','value', least(1.0,COALESCE((a.scores->'risk_vector'->>'aging')::float,0)/10.0)), jsonb_build_object('axis','위협','value', least(1.0,COALESCE((a.scores->'risk_vector'->>'threat')::float,0)/10.0)), jsonb_build_object('axis','망 남용','value', least(1.0,COALESCE((a.scores->'risk_vector'->>'network_abuse')::float,0)/10.0)) ), 'composition', cmp.arr, 'ai', jsonb_build_object( 'grade', COALESCE(j.judgment, a.anomaly_type), 'sev', CASE a.severity WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 1 ELSE 0 END, 'mock', COALESCE(j.is_mock,true), 'fast', (a.scores->'evidence_meta'->>'fast_path_match') IS NOT NULL, 'primaryType', COALESCE(a.scores->'risk_vector'->>'primary_type','—'), 'at', to_char(a.detected_at AT TIME ZONE 'Asia/Seoul','YYYY-MM-DD HH24:MI:SS'), 'reason', COALESCE(j.reason, j.details->>'reason',''), 'signals', COALESCE(a.scores->'evidence_meta'->'active_signals','[]'::jsonb), 'quality', jsonb_build_object('level',COALESCE(a.scores->'signal_quality'->>'overall','FULL'),'degraded',COALESCE((a.scores->'signal_quality'->'degraded_sources')::text,'없음')), 'explain', jsonb_build_object('level',COALESCE(a.scores->'explanation_confidence'->>'level','MED'),'basis',COALESCE((a.scores->'explanation_confidence'->'reasons')::text,'')), 'freshness', jsonb_build_object('missing','-','delay','-','lastSeen','-'), 'benign', COALESCE(j.details->>'benign_confidence',''), 'contradicting', COALESCE(j.details->>'contradicting_mining_evidence',''), 'action', COALESCE(j.action, j.details->>'action','') ) ) ))::text AS panel FROM pc_monitor.anomaly_history a LEFT JOIN pc_monitor.ai_judgment_history j ON j.anomaly_id=a.id LEFT JOIN LATERAL ( SELECT jsonb_build_array( jsonb_build_object('k','리소스','flat','#7c5cff','pct',CASE WHEN tot>0 THEN round(r/tot*100) ELSE 0 END), jsonb_build_object('k','프로세스','flat','#ec4899','pct',CASE WHEN tot>0 THEN round(p/tot*100) ELSE 0 END), jsonb_build_object('k','ML','flat','#f59e0b','pct',CASE WHEN tot>0 THEN round(m/tot*100) ELSE 0 END), jsonb_build_object('k','에피소드','flat','#06b6d4','pct',CASE WHEN tot>0 THEN round(e/tot*100) ELSE 0 END), jsonb_build_object('k','상관','flat','#84cc16','pct',CASE WHEN tot>0 THEN round(c/tot*100) ELSE 0 END), jsonb_build_object('k','네트워크','flat','#3b82f6','pct',CASE WHEN tot>0 THEN round(n/tot*100) ELSE 0 END) ) AS arr FROM (SELECT COALESCE((a.scores->'score_breakdown'->>'resource')::numeric,0) r, COALESCE((a.scores->'score_breakdown'->>'process')::numeric,0) p, COALESCE((a.scores->'score_breakdown'->>'ml')::numeric,0) m, COALESCE((a.scores->'score_breakdown'->>'episode')::numeric,0) e, COALESCE((a.scores->'score_breakdown'->>'correlation')::numeric,0) c, COALESCE((a.scores->'score_breakdown'->>'network')::numeric,0) n, COALESCE((a.scores->'score_breakdown'->>'resource')::numeric,0)+COALESCE((a.scores->'score_breakdown'->>'process')::numeric,0)+COALESCE((a.scores->'score_breakdown'->>'ml')::numeric,0)+COALESCE((a.scores->'score_breakdown'->>'episode')::numeric,0)+COALESCE((a.scores->'score_breakdown'->>'correlation')::numeric,0)+COALESCE((a.scores->'score_breakdown'->>'network')::numeric,0) tot ) bd ) cmp ON true WHERE a.pc_id = '$pc_id' ORDER BY a.detected_at DESC LIMIT 1"
         },
         {
           "refId": "ts",
