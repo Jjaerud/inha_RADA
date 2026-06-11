@@ -103,7 +103,7 @@ services:
       GF_INSTALL_PLUGINS: marcusolsson-hexmap-panel
       # Custom in-tree plugins are mounted from ./grafana-plugins/<id>/dist.
       # Unsigned, so allow-list them.
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "rada-hexmap-panel,rada-blob-gauge-panel,rada-stat-card-panel,rada-concerns-panel,rada-verdict-ribbon-panel,rada-radial-gauges-panel,rada-ai-judgment-panel"
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "rada-hexmap-panel,rada-blob-gauge-panel,rada-stat-card-panel,rada-concerns-panel,rada-verdict-ribbon-panel,rada-radial-gauges-panel,rada-ai-judgment-panel,rada-risk-vector-panel,rada-score-breakdown-panel"
       TZ: Asia/Seoul
     volumes:
       - ./infra/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
@@ -121,6 +121,8 @@ services:
       - ./grafana-plugins/rada-verdict-ribbon-panel/dist:/var/lib/grafana/plugins/rada-verdict-ribbon-panel:ro
       - ./grafana-plugins/rada-radial-gauges-panel/dist:/var/lib/grafana/plugins/rada-radial-gauges-panel:ro
       - ./grafana-plugins/rada-ai-judgment-panel/dist:/var/lib/grafana/plugins/rada-ai-judgment-panel:ro
+      - ./grafana-plugins/rada-risk-vector-panel/dist:/var/lib/grafana/plugins/rada-risk-vector-panel:ro
+      - ./grafana-plugins/rada-score-breakdown-panel/dist:/var/lib/grafana/plugins/rada-score-breakdown-panel:ro
       - rada_grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
