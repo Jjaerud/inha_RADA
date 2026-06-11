@@ -39,8 +39,9 @@ function buildPcFromData(data: any): any | null {
     vramPct: fieldArr(ts, 'vram'), netI: fieldArr(ts, 'neti'), netO: fieldArr(ts, 'neto'),
     disk: fieldArr(ts, 'disk'), vramG: null,
   };
+  const lastOf = (a: number[], fb: number) => (a && a.length ? a[a.length - 1] : fb);
   return { id: panel.id || '', online: panel.online !== false, score: panel.score ?? 0,
-    cpu: panel.cpu ?? 0, gpu: panel.gpu ?? 0, mem: panel.mem ?? 0,
+    cpu: lastOf(series.cpu, panel.cpu ?? 0), gpu: lastOf(series.gpu, panel.gpu ?? 0), mem: lastOf(series.mem, panel.mem ?? 0),
     scoreSpark: panel.scoreSpark || [], risk: panel.risk || [], composition: panel.composition || [],
     ai: panel.ai || {}, series };
 }

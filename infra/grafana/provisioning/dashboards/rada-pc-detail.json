@@ -1,19 +1,6 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
+  "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
   "uid": "rada-pc-detail",
@@ -21,8 +8,7 @@
   "tags": ["rada", "pc", "detail"],
   "timezone": "Asia/Seoul",
   "schemaVersion": 39,
-  "version": 2,
-  "weekStart": "monday",
+  "version": 3,
   "time": { "from": "now-1h", "to": "now" },
   "refresh": "5s",
   "templating": {
@@ -41,188 +27,23 @@
   },
   "panels": [
     {
-      "id": 9,
-      "type": "rada-radial-gauges-panel",
-      "title": "현재 자원 — CPU / GPU / MEM ($pc_id)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
-      "options": {
-        "title": "현재 자원",
-        "subtitle": "최신 스냅샷",
-        "countField": "",
-        "g1Label": "CPU", "g1Field": "cpu", "g1Gradient": "hot",
-        "g2Label": "GPU", "g2Field": "gpu", "g2Gradient": "hot",
-        "g3Label": "MEM", "g3Field": "mem", "g3Gradient": "mint",
-        "demoMode": false
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawSql": "SELECT cpu_percent AS cpu, gpu_percent AS gpu, mem_percent AS mem FROM metrics_history WHERE pc_id = '$pc_id' ORDER BY collected_at DESC LIMIT 1"
-        }
-      ]
-    },
-    {
       "id": 1,
-      "type": "timeseries",
-      "title": "자원 시계열 — CPU / MEM / GPU ($pc_id)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 8, "y": 0, "w": 16, "h": 8 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawSql": "SELECT collected_at AS time, cpu_percent AS \"CPU\", mem_percent AS \"MEM\", gpu_percent AS \"GPU\" FROM metrics_history WHERE pc_id = '$pc_id' AND $__timeFilter(collected_at) ORDER BY collected_at"
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "type": "timeseries",
-      "title": "VRAM / Disk I/O ($pc_id)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "decmbytes",
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawSql": "SELECT collected_at AS time, vram_mb AS \"VRAM(MB)\", disk_read_mb AS \"Disk Read(MB)\", disk_write_mb AS \"Disk Write(MB)\" FROM metrics_history WHERE pc_id = '$pc_id' AND $__timeFilter(collected_at) ORDER BY collected_at"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "네트워크 시계열 ($pc_id)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 8 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "decmbytes",
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawSql": "SELECT collected_at AS time, inbound_mb AS \"Inbound(MB)\", outbound_mb AS \"Outbound(MB)\" FROM metrics_history WHERE pc_id = '$pc_id' AND $__timeFilter(collected_at) ORDER BY collected_at"
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "type": "rada-risk-vector-panel",
+      "type": "rada-pc-detail-panel",
       "title": "",
       "transparent": true,
       "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
-      "options": { "demoMode": false },
+      "gridPos": { "h": 30, "w": 24, "x": 0, "y": 0 },
+      "options": { "demoMode": false, "demoPc": "PC-07" },
       "targets": [
         {
-          "refId": "A",
+          "refId": "meta",
           "format": "table",
-          "rawSql": "SELECT (scores->'risk_vector'->>'mining')::float AS mining, (scores->'risk_vector'->>'network_abuse')::float AS network_abuse, (scores->'risk_vector'->>'threat')::float AS threat, (scores->'risk_vector'->>'aging')::float AS aging, (scores->'risk_vector'->>'malfunction')::float AS malfunction, scores->'risk_vector'->>'primary_type' AS primary_type FROM anomaly_history WHERE pc_id = '$pc_id' ORDER BY detected_at DESC LIMIT 1"
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "type": "rada-score-breakdown-panel",
-      "title": "",
-      "transparent": true,
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 8 },
-      "options": { "demoMode": false },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawSql": "SELECT (scores->'score_breakdown'->>'resource')::float AS resource, (scores->'score_breakdown'->>'network')::float AS network, (scores->'score_breakdown'->>'process')::float AS process, (scores->'score_breakdown'->>'episode')::float AS episode, (scores->'score_breakdown'->>'correlation')::float AS correlation, (scores->'score_breakdown'->>'ml')::float AS ml, (scores->>'final')::float AS final FROM anomaly_history WHERE pc_id = '$pc_id' ORDER BY detected_at DESC LIMIT 1"
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "type": "table",
-      "title": "이상 탐지 이력 ($pc_id)",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 8 },
-      "options": { "showHeader": true },
-      "fieldConfig": {
-        "defaults": {
-          "custom": { "align": "left", "displayMode": "auto" },
-          "mappings": [
-            { "type": "value", "options": { "NORMAL": { "color": "green",        "index": 0 } } },
-            { "type": "value", "options": { "LOW":    { "color": "light-yellow", "index": 1 } } },
-            { "type": "value", "options": { "MEDIUM": { "color": "yellow",       "index": 2 } } },
-            { "type": "value", "options": { "HIGH":   { "color": "red",          "index": 3 } } }
-          ]
+          "rawSql": "SELECT (scores->'panel')::text AS panel FROM anomaly_history WHERE pc_id = '$pc_id' ORDER BY detected_at DESC LIMIT 1"
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "severity" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
-            ]
-          }
-        ]
-      },
-      "targets": [
         {
-          "refId": "A",
+          "refId": "ts",
           "format": "table",
-          "rawSql": "SELECT detected_at, severity, anomaly_type, COALESCE((scores->'score_breakdown'->>'final')::float, (scores->>'final')::float, (scores->>'total')::float, 0) AS anomaly_score FROM anomaly_history WHERE pc_id = '$pc_id' AND $__timeFilter(detected_at) ORDER BY detected_at DESC LIMIT 200"
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "type": "table",
-      "title": "Top 프로세스 ($pc_id, 최근 스냅샷)",
-      "description": "metrics_history.extra->'top_processes' 가 존재할 때만 표시. 부재 시 빈 결과.",
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 16, "y": 16, "w": 8, "h": 8 },
-      "options": { "showHeader": true },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawSql": "WITH latest AS (SELECT extra FROM metrics_history WHERE pc_id = '$pc_id' AND extra ? 'top_processes' ORDER BY collected_at DESC LIMIT 1) SELECT (proc->>'name')::text AS process, (proc->>'cpu_percent')::float AS cpu, (proc->>'mem_percent')::float AS mem FROM latest, LATERAL jsonb_array_elements(latest.extra->'top_processes') AS proc ORDER BY cpu DESC NULLS LAST LIMIT 10"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "type": "rada-ai-judgment-panel",
-      "title": "",
-      "transparent": true,
-      "datasource": { "type": "grafana-postgresql-datasource", "uid": "rada_pg" },
-      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 10 },
-      "options": { "demoMode": false },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawSql": "SELECT a.anomaly_type AS verdict, a.severity AS severity, (a.scores->>'final')::float AS score, a.scores->'risk_vector'->>'primary_type' AS primary_type, a.scores->'evidence_meta'->>'fast_path_match' AS fast_path, a.scores->'evidence_meta'->'active_signals' AS active_signals, a.scores->'signal_quality'->>'overall' AS signal_quality, a.scores->'signal_quality'->'sources' AS sq_sources, a.scores->'explanation_confidence'->>'level' AS explanation_confidence, a.scores->'explanation_confidence'->'reasons' AS expl_reasons, j.is_mock AS is_mock, j.details->>'reason' AS reason, j.details->>'action' AS action, j.details->>'benign_confidence' AS benign_confidence, j.details->>'contradicting_mining_evidence' AS contradicting_evidence, to_char(a.detected_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS') AS judged_at FROM anomaly_history a LEFT JOIN ai_judgment_history j ON j.anomaly_id = a.id WHERE a.pc_id = '$pc_id' ORDER BY a.detected_at DESC LIMIT 1"
+          "rawSql": "SELECT collected_at AS time, cpu_percent AS cpu, mem_percent AS mem, gpu_percent AS gpu, (vram_mb/8192.0*100) AS vram, inbound_mb AS neti, outbound_mb AS neto, disk_write_mb AS disk FROM metrics_history WHERE pc_id = '$pc_id' AND $__timeFilter(collected_at) ORDER BY collected_at"
         }
       ]
     }
