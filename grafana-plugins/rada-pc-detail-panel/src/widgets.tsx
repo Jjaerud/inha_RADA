@@ -233,7 +233,7 @@ export function ScoreSpark({ data }: any) {
           <circle cx={lx} cy={ly} r={4.6} fill={c} stroke="#fff" strokeWidth={2} />
         </svg>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: RADA.mono, fontSize: 9, color: RADA.fgMuted, paddingTop: 2 }}><span>-1h</span><span>-30m</span><span>now</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: RADA.mono, fontSize: 9, color: RADA.fgMuted, paddingTop: 2 }}><span>-24h</span><span>-12h</span><span>now</span></div>
     </div>
   );
 }

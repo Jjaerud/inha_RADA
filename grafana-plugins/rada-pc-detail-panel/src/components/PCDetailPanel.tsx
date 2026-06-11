@@ -99,7 +99,7 @@ export const PCDetailPanel: React.FC<Props> = ({ data, options, width, height })
         <Card flat icon={<Ic name="gpu" />} title="GPU" subtitle="현재 점유율" bodyStyle={{ padding: 0, display: 'flex' }}><GaugeBody v={pc.gpu} sub={`피크 ${Math.round(Math.min(99, pc.gpu + 4))}%`} kind="gpu" /></Card>
         <Card flat icon={<Ic name="mem" />} title="MEM" subtitle="시스템 메모리" bodyStyle={{ padding: 0, display: 'flex' }}><GaugeBody v={pc.mem} sub={`피크 ${Math.round(Math.min(99, pc.mem + 5))}%`} kind="mem" /></Card>
         <Card flat icon={<Ic name="score" />} title="등급 / score" bodyStyle={{ padding: 0, display: 'flex' }}><DecisionCard pc={pc} grade={grade} /></Card>
-        <Card flat icon={<Ic name="trend" />} title="이상 점수 추이" subtitle="최근 1h · final_score" bodyStyle={{ padding: 0, display: 'flex' }}><ScoreSpark data={pc.scoreSpark} /></Card>
+        <Card flat icon={<Ic name="trend" />} title="이상 점수 추이" subtitle="최근 24h · final_score" bodyStyle={{ padding: 0, display: 'flex' }}><ScoreSpark data={pc.scoreSpark} /></Card>
       </div>
 
       {/* ── 중단: 4 시계열 ── */}
