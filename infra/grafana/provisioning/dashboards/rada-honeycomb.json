@@ -298,7 +298,7 @@
       ],
       "options": {
         "title": "Top concerns · live",
-        "subtitle": "심각도 높은 순 · 최근 1h · PC별 최신 1건",
+        "subtitle": "심각도 높은 순 · 최근 24h · PC별 최신 1건",
         "actionLabel": "전체",
         "emptyText": "주의가 필요한 PC가 없습니다",
         "maxRows": 5,
@@ -337,8 +337,8 @@
         }
       ],
       "options": {
-        "title": "AI 판단 분포 · 1h",
-        "subtitle": "ai_judgment_history · 최근 1h",
+        "title": "AI 판단 분포 · 24h",
+        "subtitle": "ai_judgment_history · 최근 24h",
         "ribbonHeight": 22,
         "showAbnormalBadge": true,
         "animate": true,
@@ -374,9 +374,9 @@
       ],
       "options": {
         "title": "이상 탐지 피드",
-        "subtitle": "anomaly_history · 1h · live",
+        "subtitle": "anomaly_history · 24h · live",
         "actionLabel": "전체",
-        "emptyText": "최근 1시간 이상 탐지 없음",
+        "emptyText": "최근 24시간 이상 탐지 없음",
         "maxRows": 3,
         "cardTheme": "amber",
         "showDescription": true,
