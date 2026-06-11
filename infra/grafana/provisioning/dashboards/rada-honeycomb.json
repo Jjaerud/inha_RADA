@@ -369,7 +369,7 @@
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT\n  a.pc_id, a.severity,\n  COALESCE(a.anomaly_type, '') AS type,\n  COALESCE(a.message, '') AS description,\n  (a.scores->>'final')::float AS score,\n  to_char(a.detected_at AT TIME ZONE 'Asia/Seoul', 'MM-DD HH24:MI') AS minutes_ago\nFROM pc_monitor.anomaly_history a\nWHERE a.detected_at > now() - interval '24 hours'\nORDER BY a.detected_at DESC\nLIMIT 12"
+          "rawSql": "SELECT q.pc_id, q.severity, q.type, q.description, q.score, q.minutes_ago\nFROM (\n  SELECT DISTINCT ON (a.pc_id)\n    a.pc_id, a.severity,\n    COALESCE(a.anomaly_type, '') AS type,\n    COALESCE(a.message, '') AS description,\n    (a.scores->>'final')::float AS score,\n    to_char(a.detected_at AT TIME ZONE 'Asia/Seoul', 'MM-DD HH24:MI') AS minutes_ago,\n    a.detected_at\n  FROM pc_monitor.anomaly_history a\n  WHERE a.detected_at > now() - interval '24 hours'\n  ORDER BY a.pc_id, a.detected_at DESC\n) q\nORDER BY q.detected_at DESC\nLIMIT 12"
         }
       ],
       "options": {
