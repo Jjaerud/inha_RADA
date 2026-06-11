@@ -19,6 +19,19 @@ const LOBE_COLORS = [
   '#f43f5e', // rose
 ];
 
+// Twinkling + drifting starfield (matches PC-detail StatusCard). Computed once
+// with a deterministic PRNG so positions are stable across renders.
+function makeStars(n: number, seed: number) {
+  const out: Array<{ x: number; y: number; r: number; o: number; dur: number; delay: number; dx: number; dy: number }> = [];
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  for (let i = 0; i < n; i++) {
+    out.push({ x: rnd() * 100, y: rnd() * 100, r: 0.5 + rnd() * 1.5, o: 0.3 + rnd() * 0.6, dur: 2.4 + rnd() * 3.4, delay: rnd() * 4, dx: (rnd() * 2 - 1) * 3.5, dy: (rnd() * 2 - 1) * 3.5 });
+  }
+  return out;
+}
+const STARS = makeStars(22, 7321);
+
 function firstNumericValue(data: PanelProps['data']): number | null {
   for (const frame of data.series) {
     for (const field of frame.fields) {
@@ -111,13 +124,11 @@ export const BlobGaugePanel: React.FC<Props> = ({ data, options, width, height }
           width="100%"
           height="100%"
         >
-          {[
-            [22, 22, 1, 0.5],   [50, 14, 0.8, 0.35],
-            [200, 160, 1, 0.4], [280, 20, 0.8, 0.45],
-            [80, 170, 0.9, 0.4],[330, 120, 0.8, 0.35],
-            [400, 80, 0.7, 0.4],[150, 30, 0.6, 0.3],
-          ].map(([x, y, r, o], i) => (
-            <circle key={i} cx={x} cy={y} r={r} fill="#fff" opacity={o} />
+          {STARS.map((st, i) => (
+            <circle key={i} cx={`${st.x}%`} cy={`${st.y}%`} r={st.r} fill="#fff" opacity={st.o}>
+              <animate attributeName="opacity" values={`${st.o};${(st.o * 0.2).toFixed(2)};${st.o}`} dur={`${st.dur}s`} begin={`${st.delay}s`} repeatCount="indefinite" />
+              <animateTransform attributeName="transform" type="translate" values={`0 0; ${st.dx} ${st.dy}; 0 0`} dur={`${(st.dur * 1.8).toFixed(1)}s`} begin={`${st.delay}s`} repeatCount="indefinite" additive="sum" />
+            </circle>
           ))}
         </svg>
       )}
