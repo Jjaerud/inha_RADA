@@ -158,7 +158,7 @@ function extractRows(data: PanelProps['data'], options: ConcernsOptions): Concer
         type: typeF ? String(typeF.values[i] ?? '') : '',
         description: descF ? String(descF.values[i] ?? '') : undefined,
         score: scoreF ? Number(scoreF.values[i]) || 0 : 0,
-        minutesAgo: minF ? Number(minF.values[i]) || 0 : 0,
+        minutesAgo: minF ? String(minF.values[i] ?? '') : '',
       });
     }
   }
@@ -357,11 +357,11 @@ export const ConcernsPanel: React.FC<Props> = ({ data, options, width, height })
                   {r.score.toFixed(1)}
                 </div>
                 <div style={{ fontSize: 10, color: '#8b91ad', marginTop: 4, fontWeight: 500, letterSpacing: '0.06em' }}>
-                  {options.showDescription ? `${r.minutesAgo}분 전` : 'SCORE'}
+                  {options.showDescription ? r.minutesAgo : 'SCORE'}
                 </div>
                 {!options.showDescription && (
                   <div style={{ fontSize: 10, color: '#8b91ad', marginTop: 2, fontWeight: 500 }}>
-                    {r.minutesAgo}분 전
+                    {r.minutesAgo}
                   </div>
                 )}
               </div>

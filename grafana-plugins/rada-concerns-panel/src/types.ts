@@ -48,16 +48,16 @@ export interface ConcernRow {
   type: string;
   description?: string;
   score: number;
-  minutesAgo: number;
+  minutesAgo: string;   // 표시용 시각 라벨(예: '06-11 14:32')
 }
 
 // Demo rows include BOTH a short type tag and a longer description so a
 // panel instance can opt into single-line (Top concerns) or two-line
 // (이상 탐지 피드 · anomaly_history) layout.
 export const DEMO_ROWS: ConcernRow[] = [
-  { pcId: 'PC-07', severity: 3, type: 'mining suspected', description: 'Sustained GPU utilization with low entropy workload', score: 42.5, minutesAgo: 3 },
-  { pcId: 'PC-13', severity: 3, type: 'mining suspected', description: 'Tensor core idle while SM > 90%',                     score: 38.2, minutesAgo: 7 },
-  { pcId: 'PC-04', severity: 2, type: 'needs review',     description: 'Elevated CPU baseline drift',                          score: 24.0, minutesAgo: 11 },
-  { pcId: 'PC-21', severity: 2, type: 'needs review',     description: 'GPU utilization above class slot threshold',           score: 21.5, minutesAgo: 17 },
-  { pcId: 'PC-29', severity: 2, type: 'needs review',     description: 'Memory pressure rising trend',                         score: 19.0, minutesAgo: 25 },
+  { pcId: 'PC-07', severity: 3, type: 'mining suspected', description: 'Sustained GPU utilization with low entropy workload', score: 42.5, minutesAgo: '14:32' },
+  { pcId: 'PC-13', severity: 3, type: 'mining suspected', description: 'Tensor core idle while SM > 90%',                     score: 38.2, minutesAgo: '14:28' },
+  { pcId: 'PC-04', severity: 2, type: 'needs review',     description: 'Elevated CPU baseline drift',                          score: 24.0, minutesAgo: '14:24' },
+  { pcId: 'PC-21', severity: 2, type: 'needs review',     description: 'GPU utilization above class slot threshold',           score: 21.5, minutesAgo: '14:18' },
+  { pcId: 'PC-29', severity: 2, type: 'needs review',     description: 'Memory pressure rising trend',                         score: 19.0, minutesAgo: '14:10' },
 ];
