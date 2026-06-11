@@ -270,7 +270,8 @@
         "innerTitle": "PC 상태 현황",
         "innerSubtitle": "실시간 · 5초 갱신",
         "fillToCount": 40,
-        "demoMode": false
+        "demoMode": false,
+        "detailUrl": "/d/rada-pc-detail"
       }
     },
     {
