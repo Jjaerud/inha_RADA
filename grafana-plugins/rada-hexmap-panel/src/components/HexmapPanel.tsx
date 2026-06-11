@@ -1,7 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { PanelProps, DataFrame } from '@grafana/data';
+import { locationService } from '@grafana/runtime';
 import { HexmapOptions, PcCell } from '../types';
 import { injectSharedStyles } from '../inject';
+
+// Navigate to the PC detail dashboard for a clicked cell, preserving the
+// current time range / refresh / timezone query params.
+function gotoDetail(detailUrl: string, pcId: string): void {
+  if (!detailUrl) {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  params.set('var-pc_id', pcId);
+  try {
+    locationService.push(`${detailUrl}?${params.toString()}`);
+  } catch {
+    window.location.assign(`${detailUrl}?${params.toString()}`);
+  }
+}
 
 interface Props extends PanelProps<HexmapOptions> {}
 
@@ -451,6 +467,7 @@ export const HexmapPanel: React.FC<Props> = ({ data, options, width, height }) =
               transform={transform}
               onMouseEnter={() => setHover(pc.id)}
               onMouseLeave={() => setHover(null)}
+              onClick={() => gotoDetail(options.detailUrl, pc.id)}
             >
               {isHover && !isOff && (
                 <polygon

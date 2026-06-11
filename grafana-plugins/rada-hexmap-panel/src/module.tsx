@@ -110,6 +110,14 @@ export const plugin = new PanelPlugin<HexmapOptions>(HexmapPanel).setPanelOption
     category: ['Demo'],
   });
 
+  builder.addTextInput({
+    path: 'detailUrl',
+    name: 'PC 상세 대시보드 경로',
+    description: '셀 클릭 시 이동할 대시보드 경로(var-pc_id 자동 부여, 시간범위 유지). 비우면 비활성.',
+    defaultValue: defaultOptions.detailUrl,
+    category: ['Navigation'],
+  });
+
   // Field mapping group — let users point at their column names.
   builder
     .addTextInput({

@@ -41,6 +41,10 @@ export interface HexmapOptions {
   // Demo mode — when no data rows, render 40 synthetic cells with mixed
   // severity so the visual design is testable without a live client
   demoMode: boolean;
+
+  // Click navigation — clicking a hex cell pushes to this dashboard path with
+  // var-pc_id=<cell pc id> (current time range preserved). Empty = disabled.
+  detailUrl: string;
 }
 
 export const defaultOptions: HexmapOptions = {
@@ -68,6 +72,7 @@ export const defaultOptions: HexmapOptions = {
   innerSubtitle: 'PC 상태 현황',
   showInnerTitle: true,
   demoMode: false,
+  detailUrl: '/d/rada-pc-detail',
 };
 
 // Domain type — one PC tile.
