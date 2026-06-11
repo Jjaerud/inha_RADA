@@ -9,22 +9,60 @@ import { PC_DATA, VRAM_TOTAL_GB } from '../demo';
 
 interface Props extends PanelProps<PCDetailOptions> {}
 
+// ── real-data mapping ──────────────────────────────────────────────
+// Query 'meta'  → single field 'panel' (json text) = score/cpu/gpu/mem/online/
+//                 scoreSpark/risk/composition/ai
+// Query 'ts'    → time series fields cpu/mem/gpu/vram/neti/neto/disk
+function findFrame(data: any, fieldName: string): any {
+  for (const fr of data.series || []) {
+    if (fr.fields.some((f: any) => f.name === fieldName)) return fr;
+  }
+  return null;
+}
+function fieldArr(frame: any, name: string): number[] {
+  const f = frame?.fields.find((x: any) => x.name === name);
+  return f ? Array.from(f.values).map((v: any) => Number(v)) : [];
+}
+function buildPcFromData(data: any): any | null {
+  const metaFrame = findFrame(data, 'panel');
+  if (!metaFrame) return null;
+  const pf = metaFrame.fields.find((f: any) => f.name === 'panel');
+  if (!pf || pf.values.length === 0) return null;
+  let panel: any;
+  try { panel = typeof pf.values[0] === 'string' ? JSON.parse(pf.values[0]) : pf.values[0]; }
+  catch { return null; }
+  if (!panel) return null;
+
+  const ts = findFrame(data, 'cpu');
+  const series = {
+    cpu: fieldArr(ts, 'cpu'), mem: fieldArr(ts, 'mem'), gpu: fieldArr(ts, 'gpu'),
+    vramPct: fieldArr(ts, 'vram'), netI: fieldArr(ts, 'neti'), netO: fieldArr(ts, 'neto'),
+    disk: fieldArr(ts, 'disk'), vramG: null,
+  };
+  return { id: panel.id || '', online: panel.online !== false, score: panel.score ?? 0,
+    cpu: panel.cpu ?? 0, gpu: panel.gpu ?? 0, mem: panel.mem ?? 0,
+    scoreSpark: panel.scoreSpark || [], risk: panel.risk || [], composition: panel.composition || [],
+    ai: panel.ai || {}, series };
+}
+
 // Ported PCDetail content area (Sidebar/Topbar dropped — Grafana provides chrome;
 // PC selection comes from the dashboard $pc_id variable).
-export const PCDetailPanel: React.FC<Props> = ({ options, width, height }) => {
+export const PCDetailPanel: React.FC<Props> = ({ data, options, width, height }) => {
   useEffect(() => { injectSharedStyles(); }, []);
   const [cursor, setCursor] = useState<number | null>(null);
   const [expandOverride, setExpandOverride] = useState<boolean | null>(null);
 
-  const pc = PC_DATA[options.demoPc] || PC_DATA['PC-07'];
+  const realPc = !options.demoMode ? buildPcFromData(data) : null;
+  const pc = realPc || PC_DATA[options.demoPc] || PC_DATA['PC-07'];
   const grade = gradeFromScore(pc.score);
   const s = pc.series;
-  useEffect(() => { setExpandOverride(null); setCursor(null); }, [options.demoPc]);
+  const pcKey = realPc ? pc.id : options.demoPc;
+  useEffect(() => { setExpandOverride(null); setCursor(null); }, [pcKey]);
   const expanded = expandOverride !== null ? expandOverride : grade.sev >= 1;
 
-  const last = (arr: number[]) => arr[arr.length - 1];
-  const prev = (arr: number[]) => arr[arr.length - 2];
-  const vramPct = s.vramG.map((g: number) => (g / VRAM_TOTAL_GB) * 100);
+  const last = (arr: number[]) => (arr && arr.length ? arr[arr.length - 1] : 0);
+  const prev = (arr: number[]) => (arr && arr.length > 1 ? arr[arr.length - 2] : 0);
+  const vramPct = s.vramPct && s.vramPct.length ? s.vramPct : (s.vramG || []).map((g: number) => (g / VRAM_TOTAL_GB) * 100);
 
   const chartCard = (icon: string, title: string, subtitle: string, legend: any, delta: any, series: any, yMax: number, thresholds: any) => (
     <Card flat icon={<Ic name={icon} />} title={title} subtitle={subtitle}
