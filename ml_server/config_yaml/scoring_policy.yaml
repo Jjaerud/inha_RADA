@@ -182,5 +182,5 @@ episode_dedupe:
   episode_decay_after_normal_count: 12
   alert_cooldown_seconds: 60
   # AI 호출 쿨다운(초). MEDIUM+ 지속 시 매 5초가 아니라 이 간격으로만 AI 호출.
-  # severity 상승(MEDIUM→HIGH) 시 즉시 재호출. 0=비활성. 600=10분.
-  ai_call_cooldown_seconds: 600
+  # severity 상승(MEDIUM→HIGH) 시 즉시 재호출. 0=비활성. 1800=30분.
+  ai_call_cooldown_seconds: 1800
