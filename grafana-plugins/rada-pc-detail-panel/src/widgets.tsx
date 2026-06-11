@@ -343,7 +343,9 @@ export function CompositionPanel({ data }: any) {
 // ── AI 4-zone ──────────────────────────────────────────────────────
 export function AIUnifiedPanel({ ai }: any) {
   const c = gColor(ai.sev);
-  if (ai.sev === 0) return (
+  // sev 0 + 판단 본문 없음 = 진짜 정상(빈상태). 본문이 있으면(예: 엔진은 의심인데
+  // AI가 정상으로 재판정) 4존을 그대로 렌더한다.
+  if (ai.sev === 0 && !ai.reason) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%', gap: 10, padding: 24, textAlign: 'center' }}>
       <div style={{ width: 50, height: 50, borderRadius: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${RADA.normal}16`, color: RADA.normal }}><Ic name="check" size={28} /></div>
       <span style={{ fontFamily: RADA.ui, fontSize: 17, fontWeight: 700, color: RADA.normal }}>정상 · 이상 징후 없음</span>
