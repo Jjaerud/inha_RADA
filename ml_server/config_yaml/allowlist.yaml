@@ -112,3 +112,13 @@ mining_pool_ip_prefixes:
   - "209.222."
   - "101.251."
   - "39.104."
+
+# 인프라 known-good IP (RADA 서버 자신 등). 외부 연결이 전부 여기로만 가면
+# EXFIL 계열 네트워크 신호를 억제한다 — 운영자/에이전트의 자기 메트릭 전송이
+# '유출'로 오탐되던 자기참조 FP(FP-OPS-1) 차단. 정확 IP 또는 접두사.
+infra_ips:
+  - "223.130.154.165"
+
+# 에이전트(자기 자신) 프로세스 — appdata/temp/의심경로·unknown 신호에서 면제.
+agent_processes:
+  - "rada_client.exe"

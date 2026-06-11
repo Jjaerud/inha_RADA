@@ -123,6 +123,8 @@ class AllowList:
     compile_encode_processes: FrozenSet[str]
     mining_processes: FrozenSet[str]
     mining_pool_ip_prefixes: FrozenSet[str]
+    infra_ips: FrozenSet[str] = frozenset()
+    agent_processes: FrozenSet[str] = frozenset()
 
 
 # ──────────────────────────────────────────
@@ -267,6 +269,8 @@ def load_allowlist() -> AllowList:
         compile_encode_processes=_fset("compile_encode_processes"),
         mining_processes=_fset("mining_processes"),
         mining_pool_ip_prefixes=_fset("mining_pool_ip_prefixes"),
+        infra_ips=_fset("infra_ips"),
+        agent_processes=_fset("agent_processes"),
     )
     _allowlist_cache = al
     return al

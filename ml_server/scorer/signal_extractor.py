@@ -15,14 +15,35 @@ from ..policy import get_allowlist
 
 
 def _effective_whitelist() -> set:
-    """기존 WHITELIST_PROCESSES + YAML allowlist union (대소문자 무시)."""
+    """기존 WHITELIST_PROCESSES + YAML allowlist union (+ 에이전트 프로세스, 대소문자 무시)."""
     base = {p.lower() for p in WHITELIST_PROCESSES}
     try:
         al = get_allowlist()
         base |= {p.lower() for p in al.whitelist_processes}
+        base |= {p.lower() for p in getattr(al, "agent_processes", frozenset())}
     except Exception:
         pass
     return base
+
+
+def _all_external_to_infra(metrics) -> bool:
+    """외부 연결이 전부 known-good 인프라 IP(서버 자신 등)면 True.
+    이때 EXFIL 계열 네트워크 신호를 억제해 자기참조 FP(FP-OPS-1)를 막는다.
+    연결이 하나라도 allowlist 밖이면 False(= 정상 탐지). 연결이 없으면 False.
+    """
+    try:
+        infra = set(getattr(get_allowlist(), "infra_ips", frozenset()))
+    except Exception:
+        infra = set()
+    if not infra:
+        return False
+    conns = [c for c in (metrics.external_connections or [])
+             if isinstance(c, dict) and c.get("ip")]
+    if not conns:
+        return False
+    def _is_infra(ip: str) -> bool:
+        return any(ip == x or ip.startswith(x) for x in infra)
+    return all(_is_infra(c.get("ip", "")) for c in conns)
 
 
 def _detect_process_recreation(history_list: list, whitelist_eff: set) -> bool:
@@ -80,6 +101,8 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
     history_list = list(history)
     has_history  = len(history_list) >= 12
     whitelist_eff = _effective_whitelist()
+    # 인프라 allowlist: 외부 연결이 전부 known-good 서버면 EXFIL 신호 억제
+    all_ext_to_infra = _all_external_to_infra(metrics)
 
     gpu = metrics.gpu
 
@@ -320,9 +343,9 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
                              and metrics.cpu_percent >= 60),
         "mem_critical":     metrics.memory_percent >= 95,
         "mem_high":         metrics.memory_percent >= 85,
-        "net_external_high": metrics.external_packet_count >= 8,
+        "net_external_high": (metrics.external_packet_count >= 8) and not all_ext_to_infra,
         "mining_pool_ip":    mining_pool_hit,
-        "outbound_spike":    outbound_spike,
+        "outbound_spike":    outbound_spike and not all_ext_to_infra,
         "dos_spike":         dos_spike_hit,
         "known_miner":       len(known_miners) > 0,
         "temp_exec":         len(temp_exec) > 0,
@@ -330,14 +353,14 @@ def extract_signals(metrics: MetricsRequest, history: deque, slot: str,
         "exec_path_suspicious": exec_path_suspicious,
         "unknown_process_active": unknown_process_active,
         "persistent_miner":  persistent_miner,
-        "persistent_ext":    avg_ext_count >= 8,
+        "persistent_ext":    (avg_ext_count >= 8) and not all_ext_to_infra,
         "ml_anomaly":        ml_weighted_score < -0.1,
         # 3단계 신규
-        "net_out_sustained": net_out_sustained,
-        "disk_write_net_out_sustained": disk_write_net_out_sustained,
+        "net_out_sustained": net_out_sustained and not all_ext_to_infra,
+        "disk_write_net_out_sustained": disk_write_net_out_sustained and not all_ext_to_infra,
         "new_remote_ip_burst": new_remote_ip_burst,
         "mining_process_or_pool": mining_process_or_pool,
-        "spike_count_1m":    spike_count_1m,
+        "spike_count_1m":    spike_count_1m and not all_ext_to_infra,
         # #3 (Phase 2) ADDITIVE 신호 — legacy 점수 미반영, risk_vector 전용.
         "external_conn_suspicious_owner": external_conn_suspicious_owner,
         "single_core_full":  single_core_full,
