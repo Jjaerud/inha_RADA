@@ -397,7 +397,7 @@ export function AIUnifiedPanel({ ai }: any) {
         <ZoneCard tag="C" title="탈앵커링 판단" flex={1}>
           <FL label="반대 증거">{ai.contradicting}</FL>
           <FL label="benign 신뢰도">{ai.benign}</FL>
-          <span style={{ fontFamily: RADA.ui, fontSize: 9.5, color: RADA.fgMuted, fontStyle: 'italic' }}>현재 mock · 실 AI 적용 시 반대근거·재평가 자동 표시</span>
+          {ai.mock && <span style={{ fontFamily: RADA.ui, fontSize: 9.5, color: RADA.fgMuted, fontStyle: 'italic' }}>현재 mock · 실 AI 적용 시 반대근거·재평가 자동 표시</span>}
         </ZoneCard>
         <ZoneCard tag="D" title="조치" flex={1}>
           <div style={{ fontFamily: RADA.ui, fontSize: 11, color: RADA.fg, lineHeight: 1.35 }}>{ai.action}</div>
