@@ -1,7 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { PanelProps } from '@grafana/data';
+import { locationService } from '@grafana/runtime';
 import { PCDetailOptions } from '../types';
 import { injectSharedStyles } from '../inject';
+
+// ← 메인(허니컴)으로. 현재 시간범위 쿼리는 유지.
+function gotoMain(): void {
+  const search = typeof window !== 'undefined' ? window.location.search : '';
+  try {
+    locationService.push(`/d/rada-honeycomb${search}`);
+  } catch {
+    if (typeof window !== 'undefined') { window.location.assign(`/d/rada-honeycomb${search}`); }
+  }
+}
 import { RADA, gradeFromScore, Ic } from '../theme';
 import { TimeSeries } from '../charts';
 import { Card, ChartLegend, DeltaChip, StatusCard, GaugeBody, DecisionCard, ScoreSpark, RiskVectorPanel, CompositionPanel, AIUnifiedPanel } from '../widgets';
@@ -75,6 +86,12 @@ export const PCDetailPanel: React.FC<Props> = ({ data, options, width, height })
 
   return (
     <div style={{ width, height, overflow: 'auto', background: RADA.bg, color: RADA.fg, fontFamily: RADA.ui, padding: '8px 14px 14px', display: 'flex', flexDirection: 'column', gap: 11, boxSizing: 'border-box' }}>
+      {/* ── 헤더: 메인 복귀 + PC ── */}
+      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={gotoMain} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '6px 12px', borderRadius: 9, border: `1px solid ${RADA.border}`, background: '#fff', fontFamily: RADA.ui, fontSize: 12.5, fontWeight: 600, color: RADA.fg }}>‹ 메인(허니컴)</button>
+        <span style={{ fontFamily: RADA.mono, fontSize: 13, fontWeight: 600, color: RADA.fgMid }}>{pc.id || pcKey}</span>
+      </div>
+
       {/* ── 상단 ── */}
       <div style={{ flex: '0 0 auto', display: 'grid', gridTemplateColumns: '1.3fr 0.82fr 0.82fr 0.82fr 1.05fr 1.4fr', gap: 12, height: 198 }}>
         <Card flat bodyStyle={{ padding: 0, display: 'flex' }}><StatusCard pc={pc} grade={grade} /></Card>
@@ -128,7 +145,9 @@ export const PCDetailPanel: React.FC<Props> = ({ data, options, width, height })
           <Card flat icon={<Ic name="risk" />} title="risk vector" subtitle="위험 유형 5축 · 높은 순" style={{ minHeight: 0 }} bodyStyle={{ padding: 0, minHeight: 0, display: 'flex' }}>
             <RiskVectorPanel data={pc.risk} />
           </Card>
-          <Card flat icon={<Ic name="score" />} title="점수 구성 비중" subtitle="기여도 기준 · 최신 이상 점수" style={{ minHeight: 0 }} bodyStyle={{ padding: 0, minHeight: 0, display: 'flex' }}>
+          <Card flat icon={<Ic name="score" />} title="점수 구성 비중" subtitle="기여도 기준 · 최신 이상 점수"
+            action={<button onClick={() => setExpandOverride(false)} style={{ cursor: 'pointer', padding: '3px 9px', borderRadius: 7, border: `1px solid ${RADA.border}`, background: '#fff', fontFamily: RADA.ui, fontSize: 11.5, fontWeight: 600, color: RADA.fgMid }}>접기 ▴</button>}
+            style={{ minHeight: 0 }} bodyStyle={{ padding: 0, minHeight: 0, display: 'flex' }}>
             <CompositionPanel data={pc.composition} />
           </Card>
         </div>

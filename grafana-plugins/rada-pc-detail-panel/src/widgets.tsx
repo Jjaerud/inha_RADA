@@ -70,7 +70,7 @@ export function Pill({ children, tone, dash }: any) {
 export function EmptyState({ title, sub, ok = true }: any) {
   const c = ok ? RADA.normal : RADA.fgMuted;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7, height: '100%', padding: '12px 18px', textAlign: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7, height: '100%', width: '100%', padding: '12px 18px', textAlign: 'center' }}>
       <div style={{ width: 34, height: 34, borderRadius: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${c}14`, color: c }}><Ic name={ok ? 'check' : 'clock'} size={18} /></div>
       <span style={{ fontFamily: RADA.ui, fontSize: 12.5, color: RADA.fgMid, fontWeight: 600 }}>{title}</span>
       {sub && <span style={{ fontFamily: RADA.ui, fontSize: 10.5, color: RADA.fgMuted, lineHeight: 1.4 }}>{sub}</span>}

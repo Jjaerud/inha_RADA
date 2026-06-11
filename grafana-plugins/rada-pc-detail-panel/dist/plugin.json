@@ -9,7 +9,7 @@
     "logos": { "small": "img/logo.svg", "large": "img/logo.svg" },
     "links": [{ "name": "GitHub", "url": "https://github.com/Jjaerud/inha_RADA" }],
     "screenshots": [],
-    "version": "1.0.1",
+    "version": "1.0.2",
     "updated": "2026-06-11"
   },
   "dependencies": { "grafanaDependency": ">=10.0.0", "plugins": [] }
