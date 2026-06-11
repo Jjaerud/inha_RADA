@@ -269,9 +269,24 @@ def analyze(metrics: MetricsRequest):
     # 관찰(LOW/OBSERVE)은 Spring(P0-1)이 어차피 저장하지 않으므로, LOW 에서
     # LLM 을 돌리면 결과가 버려져 비용만 든다. 호출 기준을 저장/표시 기준
     # (MEDIUM 이상)과 일치시킨다.
+    # AI 호출 쿨다운: MEDIUM+ 가 지속될 때 매 5초 호출하지 않고 설정 간격
+    # (ai_call_cooldown_seconds) 으로만 호출. severity 상승 시엔 즉시 재호출.
+    # 비용/중복 ai_judgment_history 폭증 방지. 0 = 비활성(매번 호출).
     agent_result = None
-    if pattern_result["overall_severity"] in ("MEDIUM", "HIGH"):
-        agent_result = run_ai_agent(metrics, pattern_result, global_hw)
+    _sev = pattern_result["overall_severity"]
+    if _sev in ("MEDIUM", "HIGH"):
+        _sev_rank = {"MEDIUM": 2, "HIGH": 3}.get(_sev, 0)
+        try:
+            _cd = int(get_scoring_policy().episode_dedupe.ai_call_cooldown_seconds)
+        except Exception:
+            _cd = 0
+        _last = pc_history_store.ai_call_last.get(pc_id)
+        _now_ts = _time.time()
+        _escalated = _last is None or _sev_rank > _last[1]
+        _cooled = _last is None or (_now_ts - _last[0]) >= _cd
+        if _cd <= 0 or _escalated or _cooled:
+            agent_result = run_ai_agent(metrics, pattern_result, global_hw)
+            pc_history_store.ai_call_last[pc_id] = (_now_ts, _sev_rank)
 
     return _sanitize({
         "pc_id":               pc_id,

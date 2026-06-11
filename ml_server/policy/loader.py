@@ -99,6 +99,10 @@ class EpisodeDedupe:
     """
     episode_decay_after_normal_count: int = 0
     alert_cooldown_seconds: int = 0
+    # AI 호출 쿨다운(초): 동일 PC에 MEDIUM+ 가 지속될 때 AI를 매 5초 호출하지
+    # 않고 이 간격으로만 호출. severity 상승(MEDIUM→HIGH) 시엔 즉시 재호출.
+    # 0 = 비활성(매번 호출). 기본 600(10분).
+    ai_call_cooldown_seconds: int = 600
 
 
 @dataclass(frozen=True)
@@ -217,13 +221,20 @@ def _build_episode_dedupe(raw: Any) -> "EpisodeDedupe":
         cooldown = int(raw.get("alert_cooldown_seconds", 0) or 0)
     except (TypeError, ValueError):
         cooldown = 0
+    try:
+        ai_cd = int(raw.get("ai_call_cooldown_seconds", 600) or 0)
+    except (TypeError, ValueError):
+        ai_cd = 600
     if decay < 0:
         decay = 0
     if cooldown < 0:
         cooldown = 0
+    if ai_cd < 0:
+        ai_cd = 0
     return EpisodeDedupe(
         episode_decay_after_normal_count=decay,
         alert_cooldown_seconds=cooldown,
+        ai_call_cooldown_seconds=ai_cd,
     )
 
 

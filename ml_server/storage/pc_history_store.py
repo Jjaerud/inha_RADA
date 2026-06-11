@@ -51,6 +51,8 @@ _pc_minute_buffer: Dict[str, Dict[str, Any]] = {}
 # pc_id → int (consecutive spikes that met both ratio + absolute floor).
 # Reset to 0 once a sample fails either condition.
 dos_spike_streak: Dict[str, int] = {}
+# AI 호출 쿨다운 추적: pc_id -> (마지막 호출 epoch, severity_rank). 인메모리.
+ai_call_last: Dict[str, tuple] = {}
 
 # P1-3 last anomaly persist timestamp per (pc_id, anomaly_type) — used by
 # Spring AlertService for cooldown, also exposed for ML-side analytics.
@@ -233,3 +235,4 @@ def reset_all_state() -> None:
     _pc_minute_buffer.clear()
     pc_category_state.clear()
     dos_spike_streak.clear()
+    ai_call_last.clear()
