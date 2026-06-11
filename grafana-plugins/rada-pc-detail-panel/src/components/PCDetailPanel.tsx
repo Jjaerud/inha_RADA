@@ -75,6 +75,13 @@ export const PCDetailPanel: React.FC<Props> = ({ data, options, width, height })
   const last = (arr: number[]) => (arr && arr.length ? arr[arr.length - 1] : 0);
   const prev = (arr: number[]) => (arr && arr.length > 1 ? arr[arr.length - 2] : 0);
   const vramPct = s.vramPct && s.vramPct.length ? s.vramPct : (s.vramG || []).map((g: number) => (g / VRAM_TOTAL_GB) * 100);
+  // 네트워크/디스크는 고정 스케일 대신 데이터 최댓값 기준 자동 스케일(여유 20%).
+  const autoMax = (arrs: number[][], floor: number) => {
+    const m = Math.max(floor, ...arrs.flat().filter((v) => Number.isFinite(v)));
+    const padded = m * 1.2;
+    const step = padded <= 10 ? 2 : padded <= 50 ? 10 : padded <= 200 ? 25 : 100;
+    return Math.ceil(padded / step) * step;
+  };
 
   const chartCard = (icon: string, title: string, subtitle: string, legend: any, delta: any, series: any, yMax: number, thresholds: any) => (
     <Card flat icon={<Ic name={icon} />} title={title} subtitle={subtitle}
@@ -117,13 +124,13 @@ export const PCDetailPanel: React.FC<Props> = ({ data, options, width, height })
         {chartCard('net', '네트워크 시계열', '수신 · 송신 · Mbps · 1h',
           [{ label: '수신', color: RADA.blue }, { label: '송신', color: RADA.cyan }],
           <DeltaChip prev={prev(s.netI)} cur={last(s.netI)} suffix="5s" />,
-          [{ name: '수신', data: s.netI, color: RADA.blue, fill: true, fillOpacity: 0.16, width: 2, unit: ' Mbps' }, { name: '송신', data: s.netO, color: RADA.cyan, fill: false, width: 1.8, unit: ' Mbps' }],
-          40, [])}
+          [{ name: '수신', data: s.netI, color: RADA.blue, fill: true, width: 2, unit: ' Mbps' }, { name: '송신', data: s.netO, color: RADA.cyan, fill: false, width: 1.8, unit: ' Mbps' }],
+          autoMax([s.netI || [], s.netO || []], 10), [])}
         {chartCard('disk', '디스크 시계열', '읽기·쓰기 · MB/s · 1h',
           [{ label: '디스크', color: RADA.primary }],
           <DeltaChip prev={prev(s.disk)} cur={last(s.disk)} suffix="5s" />,
-          [{ name: '디스크', data: s.disk, color: RADA.primary, fill: true, fillOpacity: 0.16, width: 2, unit: ' MB/s', fmt: (v: number) => v.toFixed(1) }],
-          30, [])}
+          [{ name: '디스크', data: s.disk, color: RADA.primary, fill: true, width: 2, unit: ' MB/s', fmt: (v: number) => v.toFixed(1) }],
+          autoMax([s.disk || []], 20), [])}
       </div>
 
       {/* ── 하단 ── */}

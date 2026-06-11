@@ -51,8 +51,8 @@ export function TimeSeries({ series, yMax = 50, xLabels = ['1h', '45m', '30m', '
           <defs>
             {series.map((s: any, i: number) => (
               <linearGradient key={i} id={`ts-${uid}-${i}`} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor={s.color} stopOpacity={s.fillOpacity ?? 0.22} />
-                <stop offset="100%" stopColor={s.color} stopOpacity={0} />
+                <stop offset="0%" stopColor={s.color} stopOpacity={s.fillOpacity ?? 0.32} />
+                <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
               </linearGradient>
             ))}
           </defs>
